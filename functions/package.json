@@ -3,7 +3,7 @@
   "description": "Cloud Functions for Kingdom project",
   "private": true,
   "engines": {
-  "node": "18"
+    "node": "20"
   },
   "scripts": {
     "lint": "eslint . || true",

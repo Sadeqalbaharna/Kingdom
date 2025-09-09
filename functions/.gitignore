@@ -1,0 +1,18 @@
+# Node modules
+node_modules/
+
+# Local env / service account keys
+kingdom-ac44f-firebase-adminsdk-*.json
+*.local.json
+.env
+
+# Firebase local cache
+.firebase/
+
+# Logs
+npm-debug.log*
+package-lock.json.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
