@@ -1,6 +1,6 @@
 # Kingdom
 
-A gamified finance + fitness kingdom tracker
+The Tavern Eatery Loyalty app
 
 ## Onboarding & Auth
 
