@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class AuthService {
   Future<String?> getFaction() async {
@@ -266,13 +268,40 @@ class AuthService {
         debugPrint('requestGrantPoints: failed to read idTokenResult: $e');
       }
 
-      final callable = _functions.httpsCallable('grantPoints');
-      final res = await callable.call(<String, dynamic>{
-        'targetUid': targetUid,
-        'points': points,
-        'issuerUid': caller.uid,
-      });
-      return Map<String, dynamic>.from(res.data as Map);
+      // On web, use the HTTP CORS-enabled endpoint which accepts a
+      // Bearer ID token. Callable endpoints sometimes hit CORS preflight
+      // issues in local setups; the HTTP endpoint avoids that.
+      if (kIsWeb) {
+        final idToken = await caller.getIdToken(true);
+        final url = Uri.parse('https://us-central1-kingdom-ac44f.cloudfunctions.net/grantPointsHttp');
+        final resp = await http.post(url,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $idToken',
+            },
+            body: jsonEncode({
+              'targetUid': targetUid,
+              'points': points,
+            }));
+        if (resp.statusCode >= 200 && resp.statusCode < 300) {
+          try {
+            final body = jsonDecode(resp.body);
+            return Map<String, dynamic>.from(body as Map);
+          } catch (_) {
+            return {'success': true};
+          }
+        }
+        // surface server error
+        throw Exception('Grant failed: ${resp.statusCode} ${resp.body}');
+      } else {
+        final callable = _functions.httpsCallable('grantPoints');
+        final res = await callable.call(<String, dynamic>{
+          'targetUid': targetUid,
+          'points': points,
+          'issuerUid': caller.uid,
+        });
+        return Map<String, dynamic>.from(res.data as Map);
+      }
     } on FirebaseFunctionsException catch (e) {
       // Map unauthenticated errors to a clear, local exception for the UI.
       if (e.code == 'unauthenticated') {
@@ -282,6 +311,74 @@ class AuthService {
       // can display it. We don't perform any client-side simulation here —
       // production must use the deployed Cloud Function.
       throw Exception('Grant failed: ${e.message} (code=${e.code})');
+    }
+  }
+
+  /// Callable wrapper for teacher/staff to claim points for a student using a claimId.
+  /// Input: claimId (string UUID), studentUid, points, optional targetId
+  Future<Map<String, dynamic>> requestClaimPointsByTeacher(String claimId, String studentUid, int points, {String? targetId}) async {
+    final caller = _auth.currentUser;
+    if (caller == null) throw Exception('Not authenticated');
+    try {
+      await caller.getIdToken(true);
+    } catch (_) {
+      throw Exception('Failed to refresh auth token. Please sign in again.');
+    }
+    try {
+      if (kIsWeb) {
+        // Use HTTP endpoint on web to avoid callable CORS/preflight issues.
+        final idToken = await caller.getIdToken(true);
+        final url = Uri.parse('https://us-central1-kingdom-ac44f.cloudfunctions.net/claimPointByTeacherHttp');
+        final resp = await http.post(url,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $idToken',
+            },
+            body: jsonEncode({
+              'claimId': claimId,
+              'studentUid': studentUid,
+              'points': points,
+              if (targetId != null) 'targetId': targetId,
+            }));
+        if (resp.statusCode >= 200 && resp.statusCode < 300) {
+          try {
+            final body = jsonDecode(resp.body);
+            final m = Map<String, dynamic>.from(body as Map);
+            return {
+              'success': m['success'] == true,
+              'alreadyProcessed': m['alreadyProcessed'] == true,
+              'newPoints': m.containsKey('newPoints') ? m['newPoints'] : null,
+              'auditId': m['auditId'],
+              'message': m['message'],
+            };
+          } catch (_) {
+            return {'success': true};
+          }
+        }
+        throw Exception('Claim failed: ${resp.statusCode} ${resp.body}');
+      } else {
+        final callable = _functions.httpsCallable('claimPointByTeacher');
+        final res = await callable.call(<String, dynamic>{
+          'claimId': claimId,
+          'studentUid': studentUid,
+          'points': points,
+          if (targetId != null) 'targetId': targetId,
+        });
+        // Ensure we return a simple map containing success, alreadyProcessed, newPoints, auditId
+        final m = Map<String, dynamic>.from(res.data as Map);
+        return {
+          'success': m['success'] == true,
+          'alreadyProcessed': m['alreadyProcessed'] == true,
+          'newPoints': m.containsKey('newPoints') ? m['newPoints'] : null,
+          'auditId': m['auditId'],
+          'message': m['message'],
+        };
+      }
+    } on FirebaseFunctionsException catch (e) {
+      if (e.code == 'unauthenticated') {
+        throw Exception('Claim error: unauthenticated  ensure the staff device is signed in');
+      }
+      throw Exception('Claim failed: ${e.message} (code=${e.code})');
     }
   }
 

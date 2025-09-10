@@ -34,7 +34,7 @@ async function main() {
 }
 
 main();
-#!/usr/bin/env node
+// #!/usr/bin/env node  // <-- Moved or commented out to avoid syntax error
 const admin = require('firebase-admin');
 const path = require('path');
 

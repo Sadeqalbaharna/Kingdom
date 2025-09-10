@@ -1,152 +1,178 @@
-import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import '../hex_types.dart';
+import 'dart:math';
 
 class KingdomMapPainter extends CustomPainter {
-  final Set<Axial> unlocked;
-  final double tileSize;
-  final ui.Image? keepImg;
-  final ui.Image? mapUnderlay;
-  // grass assets kept for compatibility (unused)
-  final ui.Image? grass;
-  final ui.Image? grassActive;
+  // Hexagon grid parameters for overlay
+  final double hexRadius = 32.0; // Adjust as needed to fit 50 hexes
 
-  KingdomMapPainter({
-    required this.unlocked,
-    required this.tileSize,
-    required this.keepImg,
-    required this.mapUnderlay,
-    this.grass,
-    this.grassActive,
-  });
-
-  // axial -> pixel (pointy-top)
-  Offset axialToPixel(int q, int r, Offset center) {
-    final x = tileSize * sqrt(3) * (q + r / 2);
-    final y = tileSize * 1.5 * r;
-    return center + Offset(x, y);
+  Offset getHexCenter(int i, Size size) {
+    // ...existing code...
+    int cols = 10;
+    int col = i % cols;
+    int row = i ~/ cols;
+    double xSpacing = hexRadius * 1.75;
+    double ySpacing = hexRadius * 1.5;
+    double x = hexRadius + col * xSpacing;
+    double y = hexRadius + row * ySpacing;
+    return Offset(x, y);
   }
 
-  // pixel -> axial (fractional)
-  Offset pixelToAxial(Offset p, Offset center) {
-    final x = p.dx - center.dx;
-    final y = p.dy - center.dy;
-    final q = (sqrt(3) / 3 * x - 1 / 3 * y) / tileSize;
-    final r = (2 / 3 * y) / tileSize;
-    return Offset(q, r);
-  }
-
-  Path hexPath(Offset c, [double? radius]) {
-    final r = radius ?? tileSize;
+  Path getHexPath(Offset center, double radius) {
+    // ...existing code...
     final path = Path();
     for (int i = 0; i < 6; i++) {
-      final ang = (pi / 180) * (60 * i - 30);
-      final vx = c.dx + r * cos(ang);
-      final vy = c.dy + r * sin(ang);
-      if (i == 0) path.moveTo(vx, vy); else path.lineTo(vx, vy);
+      double angle = (i * 60) * pi / 180.0;
+      double x = center.dx + radius * cos(angle);
+      double y = center.dy + radius * sin(angle);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
     }
     path.close();
     return path;
   }
+  final ui.Image? underlay;
+  final Offset underlayOffset;
+  final double underlayScale;
+  final ui.Image? keep;
+  final ui.Image? shack;
+  final Set unlocked;
+  final double tileSize;
+  final int maxRadius;
+  final bool showGrid;
+  final bool showLabels;
+  final Map<String, ui.Image>? hexIcons;
+  final String hexLabelPrefix;
+  final String? faction;
+  final Map<String, int> hexClaimCounts;
+
+  static const Map<String, Color> factionColors = {
+    'north': ui.Color.fromARGB(255, 21, 255, 0),
+    'east': Colors.red,
+    'south': Color(0xFF1565C0), // Distinct blue (Blue 800)
+    'west': Colors.yellow,
+  };
+
+  KingdomMapPainter({
+    required this.underlay,
+  this.underlayOffset = Offset.zero,
+  this.underlayScale = 1.0,
+    required this.keep,
+    required this.shack,
+    required this.unlocked,
+    required this.tileSize,
+    required this.maxRadius,
+    required this.showGrid,
+    required this.showLabels,
+    this.hexIcons,
+    this.hexLabelPrefix = 'A',
+    this.faction,
+    this.hexClaimCounts = const {},
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final board = Offset.zero & size;
-    final center = Offset(size.width / 2, size.height / 2);
-
-    // Underlay
-    if (mapUnderlay != null) {
-      final dst = Rect.fromLTWH(0, 0, size.width, size.height);
-      final src = Rect.fromLTWH(0, 0, mapUnderlay!.width.toDouble(), mapUnderlay!.height.toDouble());
-      canvas.drawImageRect(mapUnderlay!, src, dst, Paint());
+    // Draw the map underlay FIRST so it is always visible
+    if (underlay != null) {
+      final paint = Paint();
+      final src = Rect.fromLTWH(0, 0, underlay!.width.toDouble(), underlay!.height.toDouble());
+      // Apply scale and pixel offset to the destination rect so callers can nudge the
+      // visible underlay without editing the source art. underlayScale is relative
+      // to the canvas size; underlayOffset is in logical pixels.
+      final center = Offset(size.width / 2, size.height / 2) + underlayOffset;
+      final dstWidth = size.width * underlayScale;
+      final dstHeight = size.height * underlayScale;
+      final dst = Rect.fromCenter(center: center, width: dstWidth, height: dstHeight);
+      canvas.drawImageRect(underlay!, src, dst, paint);
     } else {
-      final grad = const LinearGradient(
-        colors: [Color(0xFFDFF8D9), Color(0xFFBFECC0)],
-        begin: Alignment.topLeft, end: Alignment.bottomRight,
-      );
-      canvas.drawRect(board, Paint()..shader = grad.createShader(board));
+      final fallbackPaint = Paint()..color = Colors.grey.withOpacity(0.05);
+      canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), fallbackPaint);
     }
 
-    // Clip to map bounds
-    canvas.save();
-    canvas.clipRect(board);
-
-    // Axial bounds from corners (bulletproof coverage)
-    final corners = <Offset>[
-      const Offset(0, 0),
-      Offset(size.width, 0),
-      Offset(size.width, size.height),
-      Offset(0, size.height),
-    ].map((p) => pixelToAxial(p, center)).toList();
-
-    double minQ = corners.map((o) => o.dx).reduce(min);
-    double maxQ = corners.map((o) => o.dx).reduce(max);
-    double minR = corners.map((o) => o.dy).reduce(min);
-    double maxR = corners.map((o) => o.dy).reduce(max);
-
-    const pad = 4;
-    final qStart = minQ.floor() - pad;
-    final qEnd   = maxQ.ceil()  + pad;
-    final rStart = minR.floor() - pad;
-    final rEnd   = maxR.ceil()  + pad;
-
-    bool overlaps(Offset c) {
-      final w = sqrt(3) * tileSize;
-      final h = 2 * tileSize;
-      final rect = Rect.fromCenter(center: c, width: w, height: h);
-      return board.overlaps(rect);
-    }
-
-    // Styles
-    final gridPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0
-      ..color = Colors.black.withOpacity(0.45); // visible black grid
-
-    final ownedBorder = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.6
-      ..color = const Color(0xFF10B981); // emerald green
-
-    final haloPaint = Paint()
-      ..color = const Color(0xFF10B981).withOpacity(0.12);
-
-    for (int r = rStart; r <= rEnd; r++) {
-      for (int q = qStart; q <= qEnd; q++) {
-        final c = axialToPixel(q, r, center);
-        if (!overlaps(c)) continue;
-
-        // grid for every hex
-        canvas.drawPath(hexPath(c), gridPaint);
-
-        // owned = green border + soft inner halo, no fill
-        final a = Axial(q, r);
-        if (unlocked.contains(a)) {
-          canvas.drawPath(hexPath(c, tileSize - 3), haloPaint);
-          canvas.drawPath(hexPath(c), ownedBorder);
+    // Draw hex grid overlay and labels ABOVE the underlay
+    final center = Offset(size.width / 2, size.height / 2);
+    final r = tileSize;
+    for (int q = -maxRadius; q <= maxRadius; q++) {
+      for (int r_ = -maxRadius; r_ <= maxRadius; r_++) {
+        if ((q).abs() + (r_).abs() + (-q - r_).abs() > maxRadius * 2) continue;
+        final hexCenter = _axialToPixel(q, r_, center, r);
+        final hexBounds = Rect.fromCircle(center: hexCenter, radius: r);
+        // Only draw hexes fully inside the canvas
+        if (hexBounds.left < 0 || hexBounds.right > size.width || hexBounds.top < 0 || hexBounds.bottom > size.height) {
+          continue;
         }
+        final key = '$q,$r_';
+        if (unlocked.contains(key)) {
+          final normalizedFaction = (faction ?? '').trim().toLowerCase();
+          final borderColor = factionColors[normalizedFaction] ?? Colors.teal;
+          // No terminal logging here to avoid noisy output in console.
+          final ownedPaint = Paint()
+            ..color = borderColor.withOpacity(0.7)
+            ..strokeWidth = 3.0
+            ..style = PaintingStyle.stroke;
+          _drawHexagon(canvas, hexCenter, r, ownedPaint);
+        } else if (showGrid) {
+          final gridPaint = Paint()
+            ..color = Colors.black.withOpacity(0.7)
+            ..strokeWidth = 1.0
+            ..style = PaintingStyle.stroke;
+          _drawHexagon(canvas, hexCenter, r, gridPaint);
+        }
+        // Label all visible hexes if showLabels is true
+        if (showLabels) {
+          final textPainter = TextPainter(
+            text: TextSpan(
+              text: '$hexLabelPrefix$q,$r_',
+              style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+            textDirection: TextDirection.ltr,
+          );
+          textPainter.layout();
+          textPainter.paint(canvas, hexCenter - Offset(textPainter.width / 2, textPainter.height / 2));
+        }
+
+         // Draw icon if present for this hex
+         if (hexIcons != null && hexIcons!.containsKey(key)) {
+           final icon = hexIcons![key];
+           if (icon != null) {
+             // Draw icon at hex center, size smaller than hex
+             final iconSize = r * 1.2; // slightly smaller than hex
+             final dst = Rect.fromCenter(center: hexCenter, width: iconSize, height: iconSize);
+             final src = Rect.fromLTWH(0, 0, icon.width.toDouble(), icon.height.toDouble());
+             canvas.drawImageRect(icon, src, dst, Paint());
+           }
+         }
       }
     }
+    // ...existing code...
+  }
 
-    // Keep at center
-    final keepCenter = axialToPixel(0, 0, center);
-    final ks = tileSize * 1.6;
-    final kdst = Rect.fromCenter(center: keepCenter, width: ks, height: ks);
-    if (keepImg != null) {
-      final ksrc = Rect.fromLTWH(0, 0, keepImg!.width.toDouble(), keepImg!.height.toDouble());
-      canvas.drawImageRect(keepImg!, ksrc, kdst, Paint());
-    } else {
-      canvas.drawCircle(keepCenter, tileSize * 0.8, Paint()..color = Colors.grey);
+  Offset _axialToPixel(int q, int r, Offset center, double tileSize) {
+    final x = tileSize * (3.0 / 2.0 * q);
+    final y = tileSize * (sqrt(3) / 2.0 * q + sqrt(3) * r);
+    return Offset(center.dx + x, center.dy + y);
+  }
+
+  void _drawHexagon(Canvas canvas, Offset center, double radius, Paint paint) {
+    final path = Path();
+    for (int i = 0; i < 6; i++) {
+      final angle = pi / 3 * i;
+      final x = center.dx + radius * cos(angle);
+      final y = center.dy + radius * sin(angle);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
     }
-
-    canvas.restore();
+    path.close();
+    // Only draw the outline, not a filled hex
+    canvas.drawPath(path, paint..style = PaintingStyle.stroke);
   }
 
   @override
-  bool shouldRepaint(covariant KingdomMapPainter old) {
-    return tileSize != old.tileSize ||
-        unlocked.length != old.unlocked.length ||
-        keepImg != old.keepImg || mapUnderlay != old.mapUnderlay;
-  }
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

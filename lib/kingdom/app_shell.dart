@@ -50,7 +50,7 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
                   /// Castle header card (needs GameState)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                    child: const CastleHeaderCard(),
+                    child: CastleHeaderCard(state: ctrl.state),
                   ),
 
                   /// Map area

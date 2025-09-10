@@ -1,3 +1,4 @@
+// lib/kingdom/utils.dart
 import 'models.dart';
 
 const double kFITarget = (6550 * 12) / 0.04; // 1,965,000
@@ -8,15 +9,15 @@ String fmtInt(num v) {
   return s.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',');
 }
 
-/// Projection for charts (24 months by default)
-/// Returns a list of maps: [{'name':'M1','value':...}, ...]
-List<Map<String, dynamic>> projectPortfolio(GameState s, {int months = 24}) {
-  final pts = <Map<String, dynamic>>[];
+/// Projection for charts (24 months by default).
+/// Returns a list of maps: [{'x': 1, 'y': value}, ...]
+List<Map<String, num>> projectPortfolio(GameState s, {int months = 24}) {
+  final pts = <Map<String, num>>[];
   final monthlyRate = (s.growth.roiRate / 100.0) / 12.0;
   double v = s.portfolio;
   for (int i = 1; i <= months; i++) {
     v = v * (1.0 + monthlyRate) + s.monthlyContribution.toDouble();
-    pts.add({'name': 'M' + i.toString(), 'value': v});
+    pts.add({'x': i, 'y': v});
   }
   return pts;
 }
