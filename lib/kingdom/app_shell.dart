@@ -4,12 +4,9 @@ import 'package:provider/provider.dart';
 import 'state.dart';
 import 'widgets/castle_header_card.dart';
 import 'widgets/kingdom_click_zoom.dart';
-import 'widgets/army_tab.dart';
-import 'widgets/enemies_tab.dart';
-import 'widgets/hero_tab.dart';
-import 'widgets/scandals_tab.dart';
-import 'widgets/armors_tab.dart';
-import 'widgets/growth_tab.dart';
+import 'widgets/expandable_tabs.dart';
+import 'widgets/special_popup_overlay.dart';
+// map_progress_bar removed in favor of header-mounted ProgressNodes
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -39,63 +36,54 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
       create: (_) => GameController(),
       child: Builder(
         builder: (context) {
-          final ctrl = context.watch<GameController>();
-
           return Scaffold(
-            backgroundColor: const Color(0xFF0B1320),
+            backgroundColor: const Color.fromARGB(255, 183, 231, 163),
             body: SafeArea(
-              child: Column(
+              child: Stack(
                 children: [
-                  /// Castle header card (needs GameState)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                    child: CastleHeaderCard(state: ctrl.state),
-                  ),
-
-                  /// Map area
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Card(
-                        clipBehavior: Clip.antiAlias,
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                  // Main content
+                  Column(
+                    children: [
+                      Center(
+                        child: SizedBox(
+                          width: 366.0,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(0, 8, 0, 4),
+                            child: CastleHeaderCard(),
+                          ),
                         ),
-                        child: const KingdomClickZoom(), // reads from provider internally
+                      ),
+                      // Map underlay chooser placed above the map (left-to-right)
+                      Builder(builder: (ctx) {
+                        ],
                       ),
                     ),
+                          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+                          child: MapUnderlayChooser(
+                            selectedIndex: gc.mapUnderlayIndex,
+                            unlockedCount: totalClaimed,
+                            onChoose: (i) => gc.setMapUnderlayIndex(i),
+                          ),
+                        );
+                      }),
+                      Expanded(
+                        child: Card(
+                          clipBehavior: Clip.antiAlias,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: KingdomClickZoom(mapUnderlayIndex: Provider.of<GameController>(context).mapUnderlayIndex),
+                        ),
+                      ),
+                    ],
                   ),
-
-                  /// Tabs
-                  Container(
-                    color: Colors.black12,
-                    child: TabBar(
-                      controller: _tabController,
-                      labelColor: Colors.white,
-                      unselectedLabelColor: Colors.grey,
-                      tabs: const [
-                        Tab(text: "Army"),
-                        Tab(text: "Enemies"),
-                        Tab(text: "Hero"),
-                        Tab(text: "Scandals"),
-                        Tab(text: "Armors"),
-                        Tab(text: "Growth"),
-                      ],
-                    \] x ),
-                  ),o
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: const [
-                        ArmyTab(),
-                        EnemiesTab(),
-                        HeroTab(),
-                        ScandalsTab(),
-                        ArmorsTab(),
-                        GrowthTab(),
-                      ],
-                    ),
+                  // Special popup overlay
+                  const SpecialPopupOverlay(),
+                  // ExpandableTabs overlays at the bottom
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: const ExpandableTabs(),
                   ),
                 ],
               ),
@@ -121,3 +109,5 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
     );
   }
 }
+
+// KingdomClickZoom is now placed directly in the Card above; chooser is rendered in the Column
