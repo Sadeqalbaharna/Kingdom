@@ -43,3 +43,20 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase service account keys
+kingdom-ac44f-firebase-adminsdk-*.json
+*.firebase-adminsdk-*.json
+
+# Node
+/node_modules
+/functions/node_modules
+/functions/.firebase
+
+# Editor
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
