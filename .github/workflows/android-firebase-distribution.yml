@@ -37,10 +37,13 @@ jobs:
       - name: Build release APK
         run: flutter build apk --release
 
+      - name: Install Firebase CLI
+        run: |
+          curl -sL https://firebase.tools | bash
+
       - name: Upload APK to Firebase App Distribution
-        uses: wzieba/firebase-action@v1
-        with:
-          args: appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk --app ${{ secrets.FIREBASE_APP_ID }} --groups "${{ secrets.FIREBASE_TESTERS_GROUP }}"
+        run: |
+          firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk --app ${{ secrets.FIREBASE_APP_ID }} --groups "${{ secrets.FIREBASE_TESTERS_GROUP }}" --token "$FIREBASE_TOKEN"
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
