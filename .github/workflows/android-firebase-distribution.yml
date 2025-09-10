@@ -17,14 +17,7 @@ jobs:
         with:
           flutter-version: '3.35.3'
 
-      - name: Cache pub packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
+
 
       - name: Decode Android keystore
         run: |
@@ -42,6 +35,15 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
+
+      - name: Dump pub resolution diagnostics
+        run: |
+          echo '--- pubspec.lock ---'
+          sed -n '1,200p' pubspec.lock || true
+          echo '--- .dart_tool/package_config.json ---'
+          sed -n '1,200p' .dart_tool/package_config.json || true
+          echo '--- list lib/kingdom/widgets ---'
+          ls -la lib/kingdom/widgets || true
 
       - name: Build release APK
         run: flutter build apk --release
