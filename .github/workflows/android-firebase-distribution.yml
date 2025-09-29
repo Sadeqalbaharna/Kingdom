@@ -63,6 +63,19 @@ jobs:
         run: |
           curl -sL https://firebase.tools | bash
 
+      - name: Preflight: verify APK and Firebase access
+        run: |
+          set -e
+          echo "APK listing:"
+          ls -l build/app/outputs/flutter-apk || true
+          test -f build/app/outputs/flutter-apk/app-release.apk
+          echo "Firebase CLI version:"
+          firebase --version
+          echo "Listing Firebase apps in project kingdom-ac44f (should include the Android app)"
+          firebase apps:list --project kingdom-ac44f --token "$FIREBASE_TOKEN" || true
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
       - name: Upload APK to Firebase App Distribution
         run: |
           set -e
@@ -70,16 +83,22 @@ jobs:
             echo "FIREBASE_APP_ID is not set. Add it as a GitHub Actions secret." >&2
             exit 1
           fi
-          DIST_ARGS="--app $FIREBASE_APP_ID"
           if [ -n "$FIREBASE_TESTERS_GROUP" ]; then
-            DIST_ARGS="$DIST_ARGS --groups \"$FIREBASE_TESTERS_GROUP\""
+            firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
+              --app "$FIREBASE_APP_ID" \
+              --groups "$FIREBASE_TESTERS_GROUP" \
+              --token "$FIREBASE_TOKEN" \
+              --debug
           elif [ -n "$FIREBASE_TESTERS" ]; then
-            DIST_ARGS="$DIST_ARGS --testers \"$FIREBASE_TESTERS\""
+            firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
+              --app "$FIREBASE_APP_ID" \
+              --testers "$FIREBASE_TESTERS" \
+              --token "$FIREBASE_TOKEN" \
+              --debug
           else
             echo "Set either FIREBASE_TESTERS_GROUP or FIREBASE_TESTERS as a secret." >&2
             exit 1
           fi
-          firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk $DIST_ARGS --token "$FIREBASE_TOKEN"
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
