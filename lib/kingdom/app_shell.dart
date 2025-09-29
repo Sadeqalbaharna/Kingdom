@@ -58,6 +58,7 @@ class _MapAndCheckboxRowState extends State<_MapAndCheckboxRow> {
               Expanded(
                 child: Consumer<GameController>(
                   builder: (context, ctrl, _) {
+                    // Re-enable gating: 20 tiles for map 1, 40 for map 2
                     final totalClaimed = ctrl.totalClaimedTiles();
                     final maps = [
                       {
@@ -107,7 +108,19 @@ class _MapAndCheckboxRowState extends State<_MapAndCheckboxRow> {
                                 return Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 1.0),
                                   child: GestureDetector(
-                                    onTap: unlocked ? () => ctrl.setMapUnderlayIndex(i) : null,
+                                    onTap: () {
+                                      if (unlocked) {
+                                        ctrl.setMapUnderlayIndex(i);
+                                      } else {
+                                        final msg = (m['lockMsg'] as String?)?.trim();
+                                        if (msg != null && msg.isNotEmpty) {
+                                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
+                                          );
+                                        }
+                                      }
+                                    },
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -345,24 +358,31 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
           flex: 7,
           child: Padding(
             padding: const EdgeInsets.only(top: 0.0, bottom: 5, left: 5, right: 5),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.07),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+            child: Consumer<GameController>(
+              builder: (context, ctrl, _) => Container(
+                key: ValueKey<String>('mapcard-${ctrl.mapUnderlayIndex}')
+                ,decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.07),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InteractiveViewer(
+                  key: ValueKey<String>('iv-${ctrl.mapUnderlayIndex}')
+                  ,minScale: 0.7,
+                  maxScale: 2.5,
+                  panEnabled: true,
+                  child: KingdomClickZoom(
+                    key: ValueKey<int>(ctrl.mapUnderlayIndex),
+                    mapUnderlayIndex: ctrl.mapUnderlayIndex,
                   ),
-                ],
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: InteractiveViewer(
-                minScale: 0.7,
-                maxScale: 2.5,
-                panEnabled: true,
-                child: KingdomClickZoom(mapUnderlayIndex: Provider.of<GameController>(context, listen: false).mapUnderlayIndex),
+                ),
               ),
             ),
           ),

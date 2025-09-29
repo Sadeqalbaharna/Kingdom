@@ -33,6 +33,23 @@ class _KingdomClickZoomState extends State<KingdomClickZoom> with TickerProvider
   }
 
   @override
+  void didUpdateWidget(covariant KingdomClickZoom oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.mapUnderlayIndex != widget.mapUnderlayIndex) {
+      debugPrint('Map underlay index changed: ${oldWidget.mapUnderlayIndex} -> ${widget.mapUnderlayIndex}');
+      // Evict the new asset from cache to avoid any chance of stale image on web
+      final path = widget.mapUnderlayIndex == 0
+          ? _kUnderlay
+          : (widget.mapUnderlayIndex == 1 ? _kUnderlay2 : _kUnderlay3);
+      try {
+        const AssetImage('dummy'); // ensure class is referenced
+        AssetImage(path).evict();
+      } catch (_) {}
+      setState(() {});
+    }
+  }
+
+  @override
   void dispose() {
     _hoverTimer?.cancel();
     try {
@@ -79,12 +96,15 @@ class _KingdomClickZoomState extends State<KingdomClickZoom> with TickerProvider
   Future<void> _loadAll() async {
     _load(_kUnderlay).then((img) {
       if (mounted) setState(() => _underlay = img);
+      debugPrint('Loaded underlay A (${_kUnderlay}): ${img.width}x${img.height}');
     });
     _load(_kUnderlay2).then((img) {
       if (mounted) setState(() => _underlay2 = img);
+      debugPrint('Loaded underlay B (${_kUnderlay2}): ${img.width}x${img.height}');
     });
     _load(_kUnderlay3).then((img) {
       if (mounted) setState(() => _underlay3 = img);
+      debugPrint('Loaded underlay C (${_kUnderlay3}): ${img.width}x${img.height}');
     });
     _load(_kKeep).then((img) {
       if (mounted) setState(() => _keep = img);
@@ -140,6 +160,56 @@ class _KingdomClickZoomState extends State<KingdomClickZoom> with TickerProvider
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
+                    // Widget-level background underlay image ensures visible switching on all platforms
+                    Positioned.fill(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        switchInCurve: Curves.easeOut,
+                        switchOutCurve: Curves.easeIn,
+                        child: Image.asset(
+                          widget.mapUnderlayIndex == 0
+                              ? _kUnderlay
+                              : (widget.mapUnderlayIndex == 1 ? _kUnderlay2 : _kUnderlay3),
+                          key: ValueKey<String>('bg-${widget.mapUnderlayIndex}'),
+                          fit: BoxFit.cover,
+                          alignment: Alignment.center,
+                        ),
+                      ),
+                    ),
+                    if (kDebugMode)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: Container(
+                            color: () {
+                              switch (widget.mapUnderlayIndex) {
+                                case 1:
+                                  return Colors.blue.withValues(alpha: 0.04);
+                                case 2:
+                                  return Colors.green.withValues(alpha: 0.04);
+                                default:
+                                  return Colors.red.withValues(alpha: 0.04);
+                              }
+                            }(),
+                          ),
+                        ),
+                      ),
+                    // Painter will not draw its own underlay; background image above is the source of truth
+                    if (kDebugMode)
+                      Positioned(
+                        left: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Map: ${_getHexLabelPrefix(widget.mapUnderlayIndex)}',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
                     MouseRegion(
                   onHover: (ev) {
                     final localPos = ev.localPosition;
@@ -290,7 +360,7 @@ class _KingdomClickZoomState extends State<KingdomClickZoom> with TickerProvider
                         maxRadius: 10,
                         showGrid: gc.showGrid,
                         showLabels: gc.showHexLabels,
-                        underlay: getSelectedUnderlay(),
+                        underlay: null,
                         underlayOffset: _underlayOffsets[widget.mapUnderlayIndex] ?? Offset.zero,
                         underlayScale: _underlayScales[widget.mapUnderlayIndex] ?? 1.0,
                         keep: _keep,
