@@ -39,8 +39,18 @@ class _Entry extends StatefulWidget {
 
 class _EntryState extends State<_Entry> {
   Future<void> _continueAfterSignIn(BuildContext context) async {
-    // Capture navigator before any async gaps to satisfy lints.
-    final navigator = Navigator.of(context);
+    // Capture a navigator before any async gaps. Be resilient on web where
+    // the local context may not have a Navigator in rare timing cases.
+    NavigatorState? navigator = Navigator.maybeOf(context);
+    navigator ??= Navigator.maybeOf(this.context);
+    // As a last resort, attempt the root navigator; wrap to avoid throwing.
+    if (navigator == null) {
+      try {
+        navigator = Navigator.of(context, rootNavigator: true);
+      } catch (_) {
+        // Keep null; we'll fallback to forceAppRebuild without popping.
+      }
+    }
     var user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     // Ensure providerData is fresh (especially on web) before deciding which steps to show.
@@ -71,7 +81,16 @@ class _EntryState extends State<_Entry> {
 
     Future<void> goToApp() async {
       if (!mounted) return;
-      navigator.popUntil((r) => r.isFirst);
+      // Pop only if we have a navigator and there is a stack to clean up.
+      if (navigator != null) {
+        try {
+          if (navigator.canPop()) {
+            navigator.popUntil((r) => r.isFirst);
+          }
+        } catch (_) {
+          // Ignore pop errors; we'll still rebuild the app below.
+        }
+      }
       await Future.delayed(const Duration(milliseconds: 100));
       forceAppRebuild();
     }
@@ -84,16 +103,39 @@ class _EntryState extends State<_Entry> {
     // Push only missing steps in order; each step returns to continue the sequence
     if (!hasUsername) {
       if (!mounted) return;
-      await navigator.push(MaterialPageRoute(
-        builder: (_) => UsernameScreen(onComplete: () {}),
-      ));
+      if (navigator != null) {
+        await navigator.push(MaterialPageRoute(
+          builder: (_) => UsernameScreen(onComplete: () {}),
+        ));
+      } else {
+        try {
+          await Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(
+            builder: (_) => UsernameScreen(onComplete: () {}),
+          ));
+        } catch (_) {
+          // As a last fallback, just rebuild app (may re-enter onboarding).
+          await goToApp();
+          return;
+        }
+      }
     }
 
     if (!hasFaction) {
       if (!mounted) return;
-      await navigator.push(MaterialPageRoute(
-        builder: (_) => FactionScreen(onComplete: () {}),
-      ));
+      if (navigator != null) {
+        await navigator.push(MaterialPageRoute(
+          builder: (_) => FactionScreen(onComplete: () {}),
+        ));
+      } else {
+        try {
+          await Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(
+            builder: (_) => FactionScreen(onComplete: () {}),
+          ));
+        } catch (_) {
+          await goToApp();
+          return;
+        }
+      }
     }
 
     await goToApp();
