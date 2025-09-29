@@ -10,6 +10,7 @@ import '../models.dart';
 import '../rewards.dart';
 import 'account_widget.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 // MapProgressBar import removed; progress bar is shown under unlock buttons in AppShell
 
 class CastleHeaderCard extends StatefulWidget {
@@ -376,12 +377,18 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                           children: [
                             Text(
                               ctrl.currentUserDisplayName,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                              style: GoogleFonts.cinzel(
+                                fontSize: Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                             const SizedBox(height: 4), // add a couple pixels of space
                             Text(
                               'Hero Level: ${s.fitness.level}',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                              style: GoogleFonts.cinzel(
+                                fontSize: Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ],
                         ),
@@ -456,7 +463,10 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                           children: [
                             Text(
                               ctrl.currentUserDisplayName,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                              style: GoogleFonts.cinzel(
+                                fontSize: Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14,
+                                fontWeight: FontWeight.w700,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 4), // small extra spacing between name and level
@@ -465,7 +475,10 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                               offset: const Offset(0, -6),
                               child: Text(
                                 'Hero Level: ${s.fitness.level}',
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                style: GoogleFonts.cinzel(
+                                  fontSize: Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
                                 textAlign: TextAlign.center,
                               ),
                             ),
