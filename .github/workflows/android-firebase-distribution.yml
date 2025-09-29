@@ -28,8 +28,6 @@ jobs:
         with:
           flutter-version: '3.35.3'
 
-
-
       - name: Decode Android keystore
         run: |
           mkdir -p android/app
@@ -37,7 +35,7 @@ jobs:
 
       - name: Create android/key.properties
         run: |
-          cat > android/key.properties <<EOF
+          cat > android/key.properties <<'EOF'
           storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
           keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
@@ -63,7 +61,9 @@ jobs:
         run: |
           curl -sL https://firebase.tools | bash
 
-      - name: Preflight: verify APK and Firebase access
+      - name: "Preflight: verify APK and Firebase access"
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
           set -e
           echo "APK listing:"
@@ -73,20 +73,23 @@ jobs:
           firebase --version
           echo "Listing Firebase apps in project kingdom-ac44f (should include the Android app)"
           firebase apps:list --project kingdom-ac44f --token "$FIREBASE_TOKEN" || true
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
-      - name: Preflight: print FIREBASE_APP_ID prefix
+      - name: "Preflight: print FIREBASE_APP_ID prefix"
+        env:
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
         run: |
           if [ -n "$FIREBASE_APP_ID" ]; then
             echo "FIREBASE_APP_ID prefix: ${FIREBASE_APP_ID:0:6}******"
           else
             echo "FIREBASE_APP_ID is empty (check Actions secret mapping)"
           fi
-        env:
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
 
-      - name: Upload APK to Firebase App Distribution
+      - name: "Upload APK to Firebase App Distribution"
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_TESTERS_GROUP: ${{ secrets.FIREBASE_TESTERS_GROUP }}
+          FIREBASE_TESTERS: ${{ secrets.FIREBASE_TESTERS }}
         run: |
           set -e
           if [ -z "$FIREBASE_APP_ID" ]; then
@@ -109,11 +112,6 @@ jobs:
             echo "Set either FIREBASE_TESTERS_GROUP or FIREBASE_TESTERS as a secret." >&2
             exit 1
           fi
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-          FIREBASE_TESTERS_GROUP: ${{ secrets.FIREBASE_TESTERS_GROUP }}
-          FIREBASE_TESTERS: ${{ secrets.FIREBASE_TESTERS }}
 
       - name: Upload APK as workflow artifact
         uses: actions/upload-artifact@v4
