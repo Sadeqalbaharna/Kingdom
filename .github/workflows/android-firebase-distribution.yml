@@ -76,6 +76,16 @@ jobs:
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
+      - name: Preflight: print FIREBASE_APP_ID prefix
+        run: |
+          if [ -n "$FIREBASE_APP_ID" ]; then
+            echo "FIREBASE_APP_ID prefix: ${FIREBASE_APP_ID:0:6}******"
+          else
+            echo "FIREBASE_APP_ID is empty (check Actions secret mapping)"
+          fi
+        env:
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+
       - name: Upload APK to Firebase App Distribution
         run: |
           set -e
