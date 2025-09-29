@@ -43,7 +43,7 @@ class ProgressNodes extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.03),
             borderRadius: BorderRadius.circular(20),
           ),
           child: SingleChildScrollView(
@@ -99,7 +99,7 @@ class ProgressNodes extends StatelessWidget {
           color: Colors.green[500],
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white, width: isBig ? 2.0 : 1.4),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: isBig ? 6 : 4, offset: const Offset(0, 2))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: isBig ? 6 : 4, offset: const Offset(0, 2))],
         ),
       );
     }
@@ -113,7 +113,7 @@ class ProgressNodes extends StatelessWidget {
           shape: BoxShape.circle,
           color: Colors.grey[200],
           border: Border.all(color: Colors.grey[400]!, width: 1.6),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 2, offset: const Offset(0, 1))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 2, offset: const Offset(0, 1))],
         ),
         child: Center(
           child: Container(

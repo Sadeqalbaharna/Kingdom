@@ -1,15 +1,16 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert' as convert;
 import 'package:provider/provider.dart';
-// Firebase packages are optional on CI; this file uses a lightweight stub when
-// firebase_auth/cloud_firestore are not available. TODO: restore real
-// Firestore portrait subscription when CI issues are resolved.
 import 'dart:async';
 import '../state.dart';
 import '../models.dart';
+import '../rewards.dart';
 import 'account_widget.dart';
-import 'progress_nodes.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+// MapProgressBar import removed; progress bar is shown under unlock buttons in AppShell
 
 class CastleHeaderCard extends StatefulWidget {
   final GameState state;
@@ -21,15 +22,11 @@ class CastleHeaderCard extends StatefulWidget {
 
 class _CastleHeaderCardState extends State<CastleHeaderCard> {
   // No amount input needed
-  String? _portraitAsset;
+  // No longer needed: portrait is now in GameState
 
   @override
   void initState() {
-    super.initState();
-  // Portrait subscription using Firestore is disabled in CI builds where
-  // firebase packages may not be resolvable. Keep _portraitAsset null; UI
-  // will show default avatar. Restore subscription when CI package issues
-  // are fixed.
+  super.initState();
   }
 
   @override
@@ -67,48 +64,40 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
   final ctrl = context.watch<GameController>();
   final s = widget.state;
 
-  final totalEarnedPoints = (s.portfolio ~/ 10000); // progress bar should show earned points
+  // Resolve faction -> sigil asset path
+  final factionKey = ctrl.state.faction.trim().toLowerCase();
+  const Map<String, String> sigilPaths = {
+    'north': 'assets/images/Sigils/north.png',
+    'east': 'assets/images/Sigils/east.png',
+    'south': 'assets/images/Sigils/south.png',
+    'west': 'assets/images/Sigils/west.png',
+  };
+  final String? factionSigilPath = sigilPaths[factionKey];
+
+  // Use portrait from GameState if available
+  final portrait = s.portraitAsset;
+
+  // Removed unused totalEarnedPoints
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 0), // moved dashboard up by reducing vertical margin
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(
+  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 0), // reduced vertical padding to fix overflow
+          child: SingleChildScrollView(
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Title row
+            // Portrait and QR code row
+            // Removed duplicate Portrait/QR row that caused double header
+            // Title row (map unlock buttons and related controls)
             Row(
               children: [
                 // Account icon at top left
-                const AccountWidget(),
-                const SizedBox(width: 8),
-                const Icon(Icons.castle_outlined, size: 20),
-                const SizedBox(width: 6),
-                const Spacer(),
-                // Points counter: remaining / total earned
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.teal.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.star, color: Colors.teal, size: 18),
-                      const SizedBox(width: 6),
-                      // Show remaining/total (e.g., 3/5)
-                      Builder(builder: (ctx) {
-                        final totalEarned = (s.portfolio ~/ 10000);
-                        final totalUsed = ctrl.totalClaimedTiles();
-                        final remaining = (totalEarned - totalUsed) < 0 ? 0 : (totalEarned - totalUsed);
-                        return Text('$remaining/$totalEarned', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal));
-                      }),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Map ownership button
+                AccountWidget(),
+                const SizedBox(width: 1),
+                const SizedBox(width: 1),
+                // Map ownership button (moved left)
                 Tooltip(
                   message: 'Map ownership percentages',
                   child: IconButton(
@@ -173,35 +162,94 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                     },
                   ),
                 ),
+                const Spacer(),
+                // Points counter: remaining / total earned
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.star, color: Colors.teal, size: 18),
+                      const SizedBox(width: 6),
+                      // Show remaining/total (e.g., 3/5)
+                      Builder(builder: (ctx) {
+                        final totalEarned = (s.portfolio ~/ 10000);
+                        final totalUsed = ctrl.totalClaimedTiles();
+                        final remaining = (totalEarned - totalUsed) < 0 ? 0 : (totalEarned - totalUsed);
+                        return Text('$remaining/$totalEarned', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal));
+                      }),
+                    ],
+                  ),
+                ),
+                // Move + and - buttons up here (debug only) with red dot indicator
                 if (kDebugMode) ...[
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
+                  // tiny red dot to mark debug feature
+                  Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+                  const SizedBox(width: 6),
+                  Tooltip(
+                    message: 'Add',
+                    child: FilledButton(
+                      onPressed: () => _apply(context, 1),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(30, 30),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                      ),
+                      child: const Icon(Icons.add, size: 20),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Tooltip(
+                    message: 'Remove',
+                    child: OutlinedButton(
+                      onPressed: () => _apply(context, -1),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(30, 30),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                      ),
+                      child: const Icon(Icons.remove, size: 20),
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 0),
+                if (kDebugMode) ...[
+                  const SizedBox(width: 0),
                   // Reset all claims button (dev-only)
                   Tooltip(
                     message: 'Reset all claims',
-                    child: IconButton(
-                      icon: const Icon(Icons.autorenew_outlined),
-                      splashRadius: 20,
-                      onPressed: () async {
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (dctx) => AlertDialog(
-                            title: const Text('Reset all claims?'),
-                            content: const Text('This will unclaim every unlocked tile (except the center) and refund the points. This action cannot be undone.'),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.of(dctx).pop(false), child: const Text('Cancel')),
-                              TextButton(onPressed: () => Navigator.of(dctx).pop(true), child: const Text('Reset')),
-                            ],
-                          ),
-                        );
-                        if (confirm == true) {
-                          try {
-                            await ctrl.resetAllClaims();
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All claims reset and points refunded')));
-                          } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Reset failed: $e')));
+                    child: Transform.translate(
+                      offset: const Offset(-2, 0),
+                      child: IconButton(
+                        icon: const Icon(Icons.autorenew_outlined),
+                        splashRadius: 20,
+                        onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (dctx) => AlertDialog(
+                              title: const Text('Reset all claims?'),
+                              content: const Text('This will unclaim every unlocked tile (except the center) and refund the points. This action cannot be undone.'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.of(dctx).pop(false), child: const Text('Cancel')),
+                                TextButton(onPressed: () => Navigator.of(dctx).pop(true), child: const Text('Reset')),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            try {
+                              await ctrl.resetAllClaims();
+                              if (!mounted) return;
+                              messenger.showSnackBar(const SnackBar(content: Text('All claims reset and points refunded')));
+                            } catch (e) {
+                              if (!mounted) return;
+                              messenger.showSnackBar(SnackBar(content: Text('Reset failed: $e')));
+                            }
                           }
-                        }
-                      },
+                        },
+                      ),
                     ),
                   ),
                 ],
@@ -209,113 +257,240 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
               ],
             ),
 
-            // QR code with user info row
+            // (Reverted) Centered faction sigil row removed
+
             Row(
               children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
+                Builder(builder: (ctx) {
+                  final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+                  final payload = convert.jsonEncode({'uid': uid.isEmpty ? 'no-uid' : uid, 'name': ctrl.currentUserDisplayName});
+                  // Determine earned permanent discount using reward path definition
+                  int discount = 0;
+                  final completed = ctrl.totalClaimedTiles();
+                  final rewards = rewardPath60();
+                  for (final r in rewards) {
+                    if (r.step <= completed && r.discountPercent != null) {
+                      discount = r.discountPercent!;
+                    }
+                  }
+
+                  Widget inner;
+                  if (uid.isEmpty) {
+                    inner = Center(
+                      child: Text(
+                        'No UID',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                        textAlign: TextAlign.center,
+                      ),
+                    );
+                  } else {
+                    inner = QrImageView(
+                      data: payload,
+                      version: QrVersions.auto,
+                    );
+                  }
+
+                  final qrBox = InkWell(
                     borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Icon(Icons.qr_code, size: 48, color: Colors.grey[600]),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Allow the info column to take available space so avatar can sit to the right
-                Expanded(
-                  child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Username: ${ctrl.currentUserDisplayName}',
-                      style: Theme.of(context).textTheme.bodyMedium),
-                    Text('Hero Level: ${s.fitness.level}',
-                        style: Theme.of(context).textTheme.bodyMedium),
-          Text('Faction: ${ctrl.factionString.isNotEmpty ? ctrl.factionString : ctrl.state.faction}',
-            style: Theme.of(context).textTheme.bodyMedium),
-                  ],
-                ),
-                ),
-                const SizedBox(width: 8),
-                // Portrait on the right (opposite QR code) - larger
-                Container(
-                  width: 96,
-                  height: 96,
-                  margin: const EdgeInsets.only(left: 8),
-                  child: _portraitAsset != null
-                      ? CircleAvatar(backgroundImage: AssetImage(_portraitAsset!), radius: 48)
-                      : CircleAvatar(radius: 48, child: Icon(Icons.person, size: 48)),
-                ),
-              ],
-            ),
-
-            // Dev-only points control row
-            Row(
-              children: [
-                Tooltip(
-                  message: 'Add',
-                  child: FilledButton(
-                    onPressed: () => _apply(context, 1),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(36, 32),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                    ),
-                    child: const Icon(Icons.add, size: 20),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Tooltip(
-                  message: 'Remove',
-                  child: OutlinedButton(
-                    onPressed: () => _apply(context, -1),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(36, 32),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                    ),
-                    child: const Icon(Icons.remove, size: 20),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 8),
-            // Compact progress nodes row labelled with current underlay prefix (A/B/C)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: ProgressNodes(
-                label: _getUnderlayLabel(ctrl),
-                nodes: List.generate(20, (i) {
-                  final isActive = i < totalEarnedPoints;
-                  return ProgressNode(
-                    id: '${_getUnderlayLabel(ctrl)}-${i + 1}',
-                    tooltip: 'Node ${i + 1}: ${isActive ? 'Unlocked' : 'Locked'}',
-                    active: isActive,
                     onTap: () {
-                      // Default click: show a small snackbar with info — developers can override per-node creation
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Clicked node ${i + 1}')));
+                      showDialog(
+                        context: context,
+                        builder: (dctx) {
+                          Widget big;
+                          if (uid.isEmpty) {
+                            big = SizedBox(
+                              width: 200,
+                              height: 200,
+                              child: Center(child: Text('UID not available', style: TextStyle(color: Colors.black54))),
+                            );
+                          } else {
+                            big = SizedBox(
+                              width: 200,
+                              height: 200,
+                              child: QrImageView(
+                                data: payload,
+                                version: QrVersions.auto,
+                              ),
+                            );
+                          }
+                          return AlertDialog(
+                            content: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                border: Border.all(color: Colors.black26),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: big,
+                            ),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.of(dctx).pop(), child: const Text('Close')),
+                            ],
+                          );
+                        },
+                      );
                     },
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.black12),
+                      ),
+                      child: inner,
+                    ),
+                  );
+
+                  // Return QR with optional discount badge under it
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      qrBox,
+                      const SizedBox(height: 6),
+                      if (discount > 0)
+                        Transform.translate(
+                          offset: const Offset(0, 4), // move badge slightly lower
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                            ),
+                            child: Text(
+                              '$discount% discount',
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 12),
+                            ),
+                          ),
+                        ),
+                    ],
                   );
                 }),
-              ),
+                const SizedBox(width: 16),
+                // If no sigil, keep info here; otherwise push portrait to the right
+                (factionSigilPath == null)
+                    ? Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ctrl.currentUserDisplayName,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4), // add a couple pixels of space
+                            Text(
+                              'Hero Level: ${s.fitness.level}',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      )
+                    : const Spacer(),
+                const SizedBox(width: 12),
+                // Portrait on the right (opposite QR code) - larger
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 100,
+                      height: 100,
+                      margin: const EdgeInsets.only(left: 8),
+                      child: (portrait != null && portrait.isNotEmpty)
+                          ? CircleAvatar(backgroundImage: AssetImage(portrait), radius: 32)
+                          : const CircleAvatar(radius: 36, child: Icon(Icons.person, size: 36)),
+                    ),
+                    const SizedBox(height: 6),
+                    // Coin counter under the portrait
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF7E6),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFFE4A3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.monetization_on, size: 16, color: Color(0xFFDAA520)),
+                          const SizedBox(width: 6),
+                          Builder(builder: (ctx) {
+                            final gold = ctrl.goldAvailable;
+                            return Text('$gold Gold', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12));
+                          }),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
 
-            // ...progress nodes shown above (no textual summary beneath)
+            // Centered faction sigil (chosen in onboarding)
+            if (factionSigilPath != null) ...[
+              const SizedBox(height: 1),
+              Center(
+                child: Transform.translate(
+                  // Raise the sigil (and info) a little more
+                  offset: const Offset(0, -118),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Transform.translate(
+                        offset: const Offset(0, -6), // nudge sigil a few pixels higher
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.asset(
+                            factionSigilPath,
+                            width: 90,
+                            height: 90,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Transform.translate(
+                        offset: const Offset(0, -10), // nudge info slightly further up
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              ctrl.currentUserDisplayName,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 4), // small extra spacing between name and level
+                            // Move hero level text up a touch more
+                            Transform.translate(
+                              offset: const Offset(0, -6),
+                              child: Text(
+                                'Hero Level: ${s.fitness.level}',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            SizedBox(height: 12), // trimmed to keep layout tight
+                          ],
+                        ),
+                      ),
+                      // Progress bar moved under map unlock buttons (in AppShell)
+                    ],
+                  ),
+                ),
+              ),
+            ],
+
+            // Add a little bottom space so the card box extends below the info
+            const SizedBox(height: 20),
+
+            // Map label is now displayed above the map in AppShell
           ],
-        ),
+            ),
+          ),
       ),
     );
   }
 
-  String _getUnderlayLabel(GameController ctrl) {
-    switch (ctrl.mapUnderlayIndex) {
-      case 1:
-        return 'The Coast';
-      case 2:
-        return 'Arrid Wilderness';
-      default:
-        return 'Town of Departure';
-    }
-  }
+  /// Builds a faction sigil widget for the given faction string.
+  // Removed unused _buildFactionSigil function
 }

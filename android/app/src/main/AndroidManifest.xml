@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Internet permission required for network access (Firestore, etc.).
+         Already present in debug/profile manifests, but needed here for release. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="kingdom"
         android:name="${applicationName}"

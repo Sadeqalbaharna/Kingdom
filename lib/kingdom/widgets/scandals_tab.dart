@@ -1,7 +1,9 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models.dart';
 import '../state.dart';
+
 
 Color severityColor(int s) {
   final t = (s.clamp(0, 100)) / 100.0;

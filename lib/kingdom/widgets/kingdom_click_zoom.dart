@@ -63,8 +63,7 @@ class _KingdomClickZoomState extends State<KingdomClickZoom> with TickerProvider
   Animation<double>? _overlayAnimation;
   Animation<double>? _scaleAnimation;
 
-  bool _showGrid = true;
-  bool _showLabels = true;
+  // showGrid and showLabels are driven by GameController
   final double _tileSize = 26;
   // Per-underlay tweakable transforms (dev adjustments)
   final Map<int, Offset> _underlayOffsets = {0: Offset.zero, 1: Offset.zero, 2: Offset.zero};
@@ -129,20 +128,6 @@ class _KingdomClickZoomState extends State<KingdomClickZoom> with TickerProvider
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Checkbox(
-              value: _showGrid,
-              onChanged: (val) => setState(() => _showGrid = val ?? true),
-            ),
-            const Text('Show Grid'),
-            Checkbox(
-              value: _showLabels,
-              onChanged: (val) => setState(() => _showLabels = val ?? true),
-            ),
-            const Text('Show Labels'),
-          ],
-        ),
         Expanded(
           child: LayoutBuilder(builder: (context, c) {
             final canvasSize = Size(c.maxWidth, c.maxHeight);
@@ -152,7 +137,10 @@ class _KingdomClickZoomState extends State<KingdomClickZoom> with TickerProvider
                 width: double.infinity,
                 height: double.infinity,
                 color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha((255 * 0.05).round()),
-                child: MouseRegion(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    MouseRegion(
                   onHover: (ev) {
                     final localPos = ev.localPosition;
                     _lastPointerGlobal = ev.position;
@@ -266,8 +254,14 @@ class _KingdomClickZoomState extends State<KingdomClickZoom> with TickerProvider
                                     title: const Text('Unclaim tile?'),
                                     content: Text('Return 1 point and unclaim tile $key?'),
                                     actions: [
-                                      TextButton(onPressed: () => Navigator.of(dctx).pop(false), child: const Text('Cancel')),
-                                      TextButton(onPressed: () => Navigator.of(dctx).pop(true), child: const Text('Unclaim')),
+                                      TextButton(
+                                        onPressed: () => Navigator.of(dctx).pop(false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.of(dctx).pop(true),
+                                        child: const Text('Unclaim'),
+                                      ),
                                     ],
                                   ),
                                 ).then((confirmed) {
@@ -294,8 +288,8 @@ class _KingdomClickZoomState extends State<KingdomClickZoom> with TickerProvider
                         unlocked: unlocked,
                         tileSize: _tileSize,
                         maxRadius: 10,
-                        showGrid: _showGrid,
-                        showLabels: _showLabels,
+                        showGrid: gc.showGrid,
+                        showLabels: gc.showHexLabels,
                         underlay: getSelectedUnderlay(),
                         underlayOffset: _underlayOffsets[widget.mapUnderlayIndex] ?? Offset.zero,
                         underlayScale: _underlayScales[widget.mapUnderlayIndex] ?? 1.0,
@@ -305,65 +299,26 @@ class _KingdomClickZoomState extends State<KingdomClickZoom> with TickerProvider
                         hexLabelPrefix: _getHexLabelPrefix(widget.mapUnderlayIndex),
                         faction: gc.state.faction.trim().toLowerCase(),
                         hexClaimCounts: const {},
-                      ),
+                        // required by KingdomMapPainter
+                        specialHexQ: 0,
+                        specialHexR: 0,
+                        specialTiles: gc.specialTiles,
+                        currentUnderlay: widget.mapUnderlayIndex,
+                        painterUnderlay: widget.mapUnderlayIndex,
+                        devHighlightSpecial: kDebugMode,
+                        ),
                     ),
                   ),
+                ),
+                    // Debug overlay removed
+                  ],
                 ),
               ),
             );
           }),
         ),
         // Dev-only underlay tuner
-        if (kDebugMode)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
-            child: Row(
-              children: [
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.tune),
-                  label: const Text('Tweak underlay'),
-                  onPressed: () async {
-                    final i = widget.mapUnderlayIndex;
-                    final currentOffset = _underlayOffsets[i] ?? Offset.zero;
-                    final currentScale = _underlayScales[i] ?? 1.0;
-                    await showDialog<void>(
-                      context: context,
-                      builder: (dctx) {
-                        double sx = currentScale;
-                        double ox = currentOffset.dx;
-                        double oy = currentOffset.dy;
-                        return StatefulBuilder(builder: (ctx, setDlgState) {
-                          return AlertDialog(
-                            title: Text('Tweak underlay $i'),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(children: [Text('Scale:'), Expanded(child: Slider(value: sx, min: 0.6, max: 1.6, onChanged: (v) => setDlgState(() => sx = v)))]),
-                                Row(children: [Text('Offset X:'), Expanded(child: Slider(value: ox, min: -120, max: 120, onChanged: (v) => setDlgState(() => ox = v)))]),
-                                Row(children: [Text('Offset Y:'), Expanded(child: Slider(value: oy, min: -120, max: 120, onChanged: (v) => setDlgState(() => oy = v)))]),
-                              ],
-                            ),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.of(dctx).pop(), child: const Text('Cancel')),
-                              TextButton(
-                                onPressed: () {
-                                  _underlayOffsets[i] = Offset(ox, oy);
-                                  _underlayScales[i] = sx;
-                                  setState(() {});
-                                  Navigator.of(dctx).pop();
-                                },
-                                child: const Text('Apply'),
-                              ),
-                            ],
-                          );
-                        });
-                      },
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
+        // ...dev-only Tweak underlay button removed...
       ],
     );
   }
@@ -467,7 +422,7 @@ class _DiamondTooltipPainter extends CustomPainter {
       ..close();
 
     // stronger outer shadow for deeper pop
-    canvas.drawShadow(mainPath, Colors.black.withOpacity(0.42), 10.0, false);
+  canvas.drawShadow(mainPath, Colors.black.withValues(alpha: 0.42), 10.0, false);
 
     // richer gold frame: multi-stop gradient for warm metallic look
     final framePaint = Paint()
@@ -497,20 +452,20 @@ class _DiamondTooltipPainter extends CustomPainter {
 
     // subtle inner rim highlight
     final rimPaint = Paint()
-      ..color = Colors.white.withOpacity(0.16)
+      ..color = Colors.white.withValues(alpha: 0.16)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.6;
     canvas.drawPath(innerPath, rimPaint);
 
     // subtle inner bevel overlay (light top-left, slight dark bottom-right)
     final bevelPaint = Paint()
-      ..shader = ui.Gradient.linear(innerBgRect.topLeft, innerBgRect.bottomRight, [Colors.white.withOpacity(0.08), Colors.black.withOpacity(0.04)])
+      ..shader = ui.Gradient.linear(innerBgRect.topLeft, innerBgRect.bottomRight, [Colors.white.withValues(alpha: 0.08), Colors.black.withValues(alpha: 0.04)])
       ..blendMode = BlendMode.overlay;
     canvas.drawPath(innerPath, bevelPaint);
 
     // thin separators between quadrants (vertical + horizontal axes) for clearer tile boundaries
     final sepPaint = Paint()
-      ..color = Colors.black.withOpacity(0.12)
+      ..color = Colors.black.withValues(alpha: 0.12)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0
       ..strokeCap = StrokeCap.round;
@@ -539,27 +494,27 @@ class _DiamondTooltipPainter extends CustomPainter {
 
       // deeper drop shadow for each tile
       final shadowRrect = rrect.shift(Offset(2.4, 3.6));
-      final shadowPaint = Paint()..color = Colors.black.withOpacity(0.22);
+  final shadowPaint = Paint()..color = Colors.black.withValues(alpha: 0.22);
       canvas.drawRRect(shadowRrect, shadowPaint);
 
       // stronger beveled fill: slightly higher contrast on gradient
       final grad = ui.Gradient.linear(
         Offset(-rectSide / 2, -rectSide / 2),
         Offset(rectSide / 2, rectSide / 2),
-        [color.withOpacity(1.0), color.withOpacity(0.70)],
+  [color.withValues(alpha: 1.0), color.withValues(alpha: 0.70)],
       );
       final fill = Paint()..shader = grad;
       canvas.drawRRect(rrect, fill);
 
       // pronounced bevel highlight
       final highlight = Paint()
-        ..shader = ui.Gradient.linear(Offset(-rectSide / 2, -rectSide / 2), Offset(rectSide / 4, rectSide / 4), [Colors.white.withOpacity(0.36), Colors.white.withOpacity(0.04)])
+        ..shader = ui.Gradient.linear(Offset(-rectSide / 2, -rectSide / 2), Offset(rectSide / 4, rectSide / 4), [Colors.white.withValues(alpha: 0.36), Colors.white.withValues(alpha: 0.04)])
         ..blendMode = BlendMode.overlay;
       canvas.drawRRect(rrect.deflate(rectSide * 0.02), highlight);
 
       // dark trim border
       final borderPaint = Paint()
-        ..color = Colors.black.withOpacity(0.22)
+        ..color = Colors.black.withValues(alpha: 0.22)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.6;
       canvas.drawRRect(rrect, borderPaint);
@@ -571,7 +526,7 @@ class _DiamondTooltipPainter extends CustomPainter {
       final strokePaint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = max(2.0, fontSize * 0.14)
-        ..color = Colors.black.withOpacity(0.72)
+  ..color = Colors.black.withValues(alpha: 0.72)
         ..strokeJoin = StrokeJoin.round;
       final spanStroke = TextSpan(text: '$count', style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w900, foreground: strokePaint));
       final tpStroke = TextPainter(text: spanStroke, textDirection: TextDirection.ltr);

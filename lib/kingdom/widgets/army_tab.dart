@@ -40,13 +40,12 @@ class ArmyTab extends StatelessWidget {
     const goal = 20000;
     final pct = (s.monthlyIncome / goal * 100).clamp(0, 100).round();
 
-    // IMPORTANT:
-    // This widget is embedded inside a SingleChildScrollView provided
-    // by the ExpandableTabs sheet. So do NOT use ListView here.
-    // Use a Column so the parent scroll view controls scrolling.
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
+    // Wrap in a scroll view to prevent bottom overflow on smaller screens.
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
         // Keep padding in the parent scroll view; cards just get inner padding.
         Card(
           child: Padding(
@@ -148,7 +147,8 @@ class ArmyTab extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 100), // bottom spacer so last slider isn't under the tab bar
       ],
-    );
+    ));
   }
 }

@@ -15,8 +15,7 @@ class HeroTab extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: ListView(
         children: [
           Card(
             child: Padding(
@@ -65,36 +64,15 @@ class HeroTab extends StatelessWidget {
                     value: f.staminaXP.toDouble(),
                     onChanged: (v) => ctrl.setStaminaXP(v.round()),
                   ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          decoration:
-                              const InputDecoration(labelText: 'Level'),
-                          keyboardType: TextInputType.number,
-                          controller:
-                              TextEditingController(text: f.level.toString()),
-                          onSubmitted: (t) {
-                            final v = int.tryParse(t);
-                            if (v != null) ctrl.setLevel(v);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          decoration: const InputDecoration(
-                              labelText: 'Armor Tier (1-5)'),
-                          keyboardType: TextInputType.number,
-                          controller: TextEditingController(
-                              text: f.armorTier.toString()),
-                          onSubmitted: (t) {
-                            final v = int.tryParse(t);
-                            if (v != null) ctrl.setArmorTier(v);
-                          },
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    decoration: const InputDecoration(labelText: 'Armor Tier (1-5)'),
+                    keyboardType: TextInputType.number,
+                    controller: TextEditingController(text: f.armorTier.toString()),
+                    onSubmitted: (t) {
+                      final v = int.tryParse(t);
+                      if (v != null) ctrl.setArmorTier(v);
+                    },
                   ),
                 ],
               ),

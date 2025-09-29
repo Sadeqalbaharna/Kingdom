@@ -20,6 +20,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
           icon: const Icon(Icons.edit),
           onPressed: () async {
             final controller = TextEditingController();
+            final navigator = Navigator.of(context);
             final result = await showDialog<String?>(
               context: context,
               builder: (dctx) => AlertDialog(
@@ -35,7 +36,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
               ),
             );
             if (result != null && result.isNotEmpty) {
-              if (mounted) Navigator.of(context).pop(result);
+              if (mounted) navigator.pop(result);
             }
           },
         ),

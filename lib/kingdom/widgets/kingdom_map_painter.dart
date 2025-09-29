@@ -49,6 +49,15 @@ class KingdomMapPainter extends CustomPainter {
   final String? faction;
   final Map<String, int> hexClaimCounts;
 
+  // For dev-only legacy highlight (single special)
+  final int specialHexQ;
+  final int specialHexR;
+  // For multi-special support (may include extra keys like 'kind')
+  final List<Map<String, dynamic>>? specialTiles;
+  final int currentUnderlay;
+  final int painterUnderlay;
+  final bool devHighlightSpecial;
+
   static const Map<String, Color> factionColors = {
     'north': ui.Color.fromARGB(255, 21, 255, 0),
     'east': Colors.red,
@@ -71,6 +80,12 @@ class KingdomMapPainter extends CustomPainter {
     this.hexLabelPrefix = 'A',
     this.faction,
     this.hexClaimCounts = const {},
+  required this.specialHexQ,
+  required this.specialHexR,
+  this.specialTiles,
+    required this.currentUnderlay,
+    required this.painterUnderlay,
+    this.devHighlightSpecial = false,
   });
 
   @override
@@ -88,7 +103,7 @@ class KingdomMapPainter extends CustomPainter {
       final dst = Rect.fromCenter(center: center, width: dstWidth, height: dstHeight);
       canvas.drawImageRect(underlay!, src, dst, paint);
     } else {
-      final fallbackPaint = Paint()..color = Colors.grey.withOpacity(0.05);
+  final fallbackPaint = Paint()..color = Colors.grey.withValues(alpha: 0.05);
       canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), fallbackPaint);
     }
 
@@ -110,13 +125,13 @@ class KingdomMapPainter extends CustomPainter {
           final borderColor = factionColors[normalizedFaction] ?? Colors.teal;
           // No terminal logging here to avoid noisy output in console.
           final ownedPaint = Paint()
-            ..color = borderColor.withOpacity(0.7)
+            ..color = borderColor.withValues(alpha: 0.7)
             ..strokeWidth = 3.0
             ..style = PaintingStyle.stroke;
           _drawHexagon(canvas, hexCenter, r, ownedPaint);
         } else if (showGrid) {
           final gridPaint = Paint()
-            ..color = Colors.black.withOpacity(0.7)
+            ..color = Colors.black.withValues(alpha: 0.7)
             ..strokeWidth = 1.0
             ..style = PaintingStyle.stroke;
           _drawHexagon(canvas, hexCenter, r, gridPaint);
@@ -145,6 +160,36 @@ class KingdomMapPainter extends CustomPainter {
              canvas.drawImageRect(icon, src, dst, Paint());
            }
          }
+
+        // Highlight all special tiles (multi)
+        if (devHighlightSpecial && specialTiles != null && currentUnderlay == painterUnderlay) {
+          for (int i = 0; i < specialTiles!.length; i++) {
+            final tile = specialTiles![i];
+            if (tile['q'] == q && tile['r'] == r_) {
+              // Choose border color per kind for debug clarity
+              final kind = (tile['kind'] as String?) ?? '';
+              Color c;
+              switch (kind) {
+                case 'voucher':
+                  c = Colors.amber; // gold/yellow
+                  break;
+                case 'lore':
+                  c = Colors.cyan; // teal/cyan
+                  break;
+                case 'unfortunate':
+                  c = Colors.pinkAccent; // red/pink
+                  break;
+                default:
+                  c = (i == 0 ? Colors.amber : Colors.cyan);
+              }
+              final specialPaint = Paint()
+                ..color = c.withValues(alpha: 0.85)
+                ..strokeWidth = 5.0
+                ..style = PaintingStyle.stroke;
+              _drawHexagon(canvas, hexCenter, r * 1.10, specialPaint);
+            }
+          }
+        }
       }
     }
     // ...existing code...

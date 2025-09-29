@@ -8,10 +8,9 @@ class Debt {
   Debt({
     required this.id,
     required this.name,
-    required int balance,
-    required int original,
-  })  : balance = balance,
-        original = original;
+    required this.balance,
+    required this.original,
+  });
 
   bool get isAlive => balance > 0;
 }
@@ -20,7 +19,7 @@ class Expense {
   String id;
   String name;
   int monthly;
-  Expense({required this.id, required this.name, required int monthly}) : monthly = monthly;
+  Expense({required this.id, required this.name, required this.monthly});
 
   String get label => name;
 }
@@ -64,10 +63,9 @@ class ArmorPolicy {
     required this.id,
     required this.name,
     this.active = false,
-    int premium = 0,
-    int coverage = 0,
-  })  : premium = premium,
-        coverage = coverage;
+    this.premium = 0,
+    this.coverage = 0,
+  });
 }
 
 typedef InsurancePolicy = ArmorPolicy;
@@ -81,12 +79,11 @@ class GrowthInfo {
 
   GrowthInfo({
     required this.booksRead,
-    required double roi,
+    required this.roi,
     int? libraries,
     int? temples,
     int? workshops,
-  })  : roi = roi,
-        libraries = libraries ?? (booksRead ~/ 10),
+  })  : libraries = libraries ?? (booksRead ~/ 10),
         temples = temples ?? 0,
         workshops = workshops ?? 0;
 
@@ -108,6 +105,8 @@ class GameState {
   bool showHexLabels; // dev toggle
   int availablePoints;
   String faction;
+  String? portraitAsset;
+  int goldSpent;
 
   GameState({
     required this.portfolio,
@@ -123,5 +122,7 @@ class GameState {
     this.showHexLabels = false,
     this.availablePoints = 0,
     this.faction = '',
+    this.portraitAsset,
+    this.goldSpent = 0,
   });
 }

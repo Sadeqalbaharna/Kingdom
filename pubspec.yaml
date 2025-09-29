@@ -23,6 +23,8 @@ dependencies:
   cloud_functions: ^5.6.2
   mobile_scanner: ^7.0.1
   uuid: ^3.0.6
+  turn_page_transition: ^0.5.0
+  http: ^1.2.2
 
   # You can add more deps later (animations, storage, firebase, etc.)
   # Example: shared_preferences: ^2.2.2
@@ -48,3 +50,11 @@ flutter:
     - assets/images/portraits/Gemini_Generated_Image_rgtie3rgtie3rgti.png
     - assets/images/portraits/Gemini_Generated_Image_u5ou4lu5ou4lu5ou.png
     - assets/images/portraits/Gemini_Generated_Image_xgeshlxgeshlxges.png
+  # Faction sigils (use exact casing as on disk)
+    - assets/images/Sigils/
+    - assets/images/vouchers/freedrink.png
+    - assets/images/vouchers/main.png
+    - assets/images/vouchers/drink.png
+    - assets/images/vouchers/starter.png
+    - assets/images/vouchers/dessert.png
+    - assets/images/vouchers/soda.png

@@ -17,6 +17,26 @@ class _PasswordScreenState extends State<PasswordScreen> {
   bool _busy = false;
   String? _error;
 
+  @override
+  void initState() {
+    super.initState();
+    // After first frame, reload and check providerData to avoid stale state on web.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) return;
+        await user.reload();
+        await Future.delayed(const Duration(milliseconds: 50));
+        final refreshed = FirebaseAuth.instance.currentUser;
+        final hasPasswordProvider = refreshed?.providerData.any((p) => p.providerId == 'password') ?? false;
+        if (hasPasswordProvider && mounted) {
+          widget.onComplete();
+          Navigator.of(context).maybePop();
+        }
+      } catch (_) {}
+    });
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -29,8 +49,10 @@ class _PasswordScreenState extends State<PasswordScreen> {
         setState(() => _error = 'No user is currently signed in.');
         return;
       }
-      final providers = await FirebaseAuth.instance.fetchSignInMethodsForEmail(user.email!);
-      if (providers.contains('password')) {
+      // Prefer providerData over deprecated fetchSignInMethodsForEmail.
+      final hasPasswordProvider = user.providerData.any((p) => p.providerId == 'password');
+      if (hasPasswordProvider) {
+        // User already linked with password; just update to the new one.
         await user.updatePassword(_pwd.text);
         widget.onComplete();
         return;

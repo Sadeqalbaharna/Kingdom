@@ -148,17 +148,20 @@ class AuthService {
   Future<void> _ensureUserDoc(User? user) async {
     if (user == null) return;
     final ref = _db.collection('users').doc(user.uid);
-    final snap = await ref.get();
-    if (!snap.exists) {
-      await ref.set({
-        'email': user.email,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    }
+    // Write without a pre-read to avoid permission-denied when rules restrict reads.
+    // Using merge ensures we don't wipe existing fields.
+    await ref.set({
+      'email': user.email,
+      // Note: this will update createdAt on subsequent logins; if you need immutable
+      // createdAt, set it from a trusted environment (e.g., Cloud Functions) or add
+      // server-side logic. For now, prefer reliability over a failing read.
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   /// Atomically increment claim count for a tile for [faction].
-  /// Uses a top-level `tile_claims` collection where each doc id is '<underlay>_<q,r>'.
+  /// Uses a top-level `tile_claims` collection where each doc id is `&lt;underlay&gt;_&lt;q,r&gt;`.
   Future<void> claimTile(int underlay, String tileKey, String faction) async {
     final id = '${underlay}_$tileKey';
     final ref = _db.collection('tile_claims').doc(id);
@@ -385,13 +388,5 @@ class AuthService {
   /// Debug helper: call the grantPoints callable with a known test UID.
   /// Use this during development (hook to a button) to exercise the callable
   /// and quickly capture client-side errors in the browser/console.
-  Future<void> testGrant({String targetUid = '0YzqiEbNYGfIJJtHDRXxxmkeZb12', int points = 10}) async {
-    try {
-      final res = await requestGrantPoints(targetUid, points, allowDebugFallback: true);
-      debugPrint('testGrant: success -> $res');
-    } catch (e, st) {
-      debugPrint('testGrant: error -> $e\n$st');
-      rethrow;
-    }
-  }
+  // testGrant helper removed
 }

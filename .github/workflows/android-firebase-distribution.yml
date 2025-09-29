@@ -2,7 +2,12 @@ name: Build Android and Upload to Firebase App Distribution
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, Testing ]
+    paths:
+      - "lib/**"
+      - "pubspec.yaml"
+      - "android/**"
+      - ".github/workflows/android-firebase-distribution.yml"
   workflow_dispatch:
 
 jobs:
@@ -11,6 +16,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -54,9 +65,26 @@ jobs:
 
       - name: Upload APK to Firebase App Distribution
         run: |
-          firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk --app ${{ secrets.FIREBASE_APP_ID }} --groups "${{ secrets.FIREBASE_TESTERS_GROUP }}" --token "$FIREBASE_TOKEN"
+          set -e
+          if [ -z "$FIREBASE_APP_ID" ]; then
+            echo "FIREBASE_APP_ID is not set. Add it as a GitHub Actions secret." >&2
+            exit 1
+          fi
+          DIST_ARGS="--app $FIREBASE_APP_ID"
+          if [ -n "$FIREBASE_TESTERS_GROUP" ]; then
+            DIST_ARGS="$DIST_ARGS --groups \"$FIREBASE_TESTERS_GROUP\""
+          elif [ -n "$FIREBASE_TESTERS" ]; then
+            DIST_ARGS="$DIST_ARGS --testers \"$FIREBASE_TESTERS\""
+          else
+            echo "Set either FIREBASE_TESTERS_GROUP or FIREBASE_TESTERS as a secret." >&2
+            exit 1
+          fi
+          firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk $DIST_ARGS --token "$FIREBASE_TOKEN"
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_TESTERS_GROUP: ${{ secrets.FIREBASE_TESTERS_GROUP }}
+          FIREBASE_TESTERS: ${{ secrets.FIREBASE_TESTERS }}
 
       - name: Upload APK as workflow artifact
         uses: actions/upload-artifact@v4

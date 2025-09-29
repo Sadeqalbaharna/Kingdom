@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-// ...existing code...
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../auth_service.dart';
 
 class GoogleSignInScreen extends StatefulWidget {
@@ -48,9 +48,7 @@ class _GoogleSignInScreenState extends State<GoogleSignInScreen> {
       _error = null;
     });
     try {
-      // Try silent sign-in for web, fallback to signIn for both platforms
-      bool isWeb = identical(0, 0.0);
-      if (isWeb) {
+      if (kIsWeb) {
         final googleSignIn = GoogleSignIn();
         final user = await googleSignIn.signInSilently();
         if (user != null) {
@@ -58,13 +56,16 @@ class _GoogleSignInScreenState extends State<GoogleSignInScreen> {
           widget.onSignedIn();
           return;
         }
+        // On web, do nothing here; the button will handle sign-in
+        setState(() => _busy = false);
+        return;
       }
       await _auth.signInWithGoogle();
       widget.onSignedIn();
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && !kIsWeb) setState(() => _busy = false);
     }
   }
 
@@ -89,7 +90,31 @@ class _GoogleSignInScreenState extends State<GoogleSignInScreen> {
                       if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
                       const SizedBox(height: 8),
                       ElevatedButton.icon(
-                        onPressed: _busy ? null : _go,
+                        onPressed: _busy
+                            ? null
+                            : () async {
+                                setState(() => _busy = true);
+                                setState(() => _error = null);
+                                try {
+                                  if (kIsWeb) {
+                                    final googleSignIn = GoogleSignIn();
+                                    final user = await googleSignIn.signInSilently();
+                                    if (user != null) {
+                                      await _auth.signInWithGoogle(silent: true);
+                                      widget.onSignedIn();
+                                      return;
+                                    }
+                                    await _auth.signInWithGoogle();
+                                    widget.onSignedIn();
+                                  } else {
+                                    await _go();
+                                  }
+                                } catch (e) {
+                                  setState(() => _error = e.toString());
+                                } finally {
+                                  if (mounted) setState(() => _busy = false);
+                                }
+                              },
                         icon: const Icon(Icons.login),
                         label: const Text('Continue with Google'),
                       ),

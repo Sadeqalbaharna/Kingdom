@@ -1,3 +1,5 @@
+// ...existing imports...
+
 import 'dart:math' as math;
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,6 +14,22 @@ double _clampd(num v, double min, double max) =>
 
 /// Controller used with Provider.
 class GameController extends ChangeNotifier {
+  // Legacy compatibility: single special tile fields (not used in new logic)
+  int? specialHexQ;
+  int? specialHexR;
+  /// Generate and save a voucher for the current user
+  Future<void> generateAndSaveVoucher() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final uuid = UniqueKey().toString();
+    final voucherRef = FirebaseFirestore.instance.collection('vouchers').doc(uuid);
+    await voucherRef.set({
+      'id': uuid,
+      'userId': user.uid,
+      'issuedAt': FieldValue.serverTimestamp(),
+      'claimed': false,
+    });
+  }
   Future<void> setFaction(String faction) async => await _authService.setFaction(faction);
   Future<String?> get faction async => await _authService.getFaction();
   String get currentUserDisplayName => _authService.currentUser?.displayName ?? "Player";
@@ -21,6 +39,18 @@ class GameController extends ChangeNotifier {
     try {
       final loaded = await _authService.loadUnlockedTiles();
       final faction = await _authService.getFaction() ?? '';
+      // Also fetch portrait asset from user doc
+      String? portraitAsset;
+      try {
+        final user = _authService.currentUser;
+        if (user != null) {
+          final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+          final data = doc.data();
+          if (data != null && data['portrait'] is String) {
+            portraitAsset = data['portrait'] as String;
+          }
+        }
+      } catch (_) {}
       if (loaded.isNotEmpty) {
         unlockedTilesByUnderlay.clear();
         unlockedTilesByUnderlay.addAll({
@@ -36,13 +66,14 @@ class GameController extends ChangeNotifier {
             unlockedTilesByUnderlay[k] = v;
           }
         });
-  // Compute availablePoints as (points earned from portfolio) - (points used for claimed tiles)
-  final totalPointsObtained = (state.portfolio ~/ 10000);
-  final totalPointsUsed = _totalClaimedTiles();
-  final totalPointsRemaining = totalPointsObtained - totalPointsUsed;
-  // Ensure available points never go negative
-  state.availablePoints = totalPointsRemaining < 0 ? 0 : totalPointsRemaining;
+        // Compute availablePoints as (points earned from portfolio) - (points used for claimed tiles)
+        final totalPointsObtained = (state.portfolio ~/ 10000);
+        final totalPointsUsed = _totalClaimedTiles();
+        final totalPointsRemaining = totalPointsObtained - totalPointsUsed;
+        // Ensure available points never go negative
+        state.availablePoints = totalPointsRemaining < 0 ? 0 : totalPointsRemaining;
         state.faction = faction;
+        state.portraitAsset = portraitAsset;
         notifyListeners();
       }
     } catch (e) {
@@ -130,14 +161,97 @@ class GameController extends ChangeNotifier {
         });
   }
   GameState state;
+  // UI toggles
+  bool _showGrid = true;
+  bool get showGrid => _showGrid;
+  void setShowGrid(bool v) {
+    if (_showGrid == v) return;
+    _showGrid = v;
+    notifyListeners();
+  }
+  void setShowHexLabels(bool v) {
+    if (state.showHexLabels == v) return;
+    state.showHexLabels = v;
+    notifyListeners();
+  }
   StreamSubscription<User?>? _authSub;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userDocSub;
-    /// Event for special hex claim (e.g., chest found)
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _voucherClaimSub;
+  bool _voucherClaimInitialized = false;
+  int? _lastKnownEarnedPoints; // tracks total earned points for congrats detection
+    /// Events for special hex claims (e.g., chest found)
     String? specialMessage;
     String? specialPopupAsset;
     DateTime? specialPopupTimestamp;
-  int? specialHexQ;
-  int? specialHexR;
+  // List of special tile coordinates for the current underlay: List<Map<String, int>> with keys 'q' and 'r'
+  List<Map<String, int>> specialTiles = [];
+
+  // ---------- Rewards / Gold Tally ----------
+  // Gold awarded per step (1..60). Non-gold rewards and discounts are 0.
+  static const List<int> _goldByStep = [
+    // 1..20 (Tier I)
+    5, 5, 10, 5, 0, 10, 5, 10, 5, 0, 10, 5, 10, 5, 0, 10, 5, 10, 5, 0,
+    // 21..40 (Tier II)
+    10, 5, 10, 5, 0, 10, 5, 10, 5, 0, 10, 5, 10, 5, 0, 10, 5, 10, 5, 0,
+    // 41..60 (Tier III)
+    10, 5, 10, 5, 0, 10, 5, 10, 5, 0, 15, 10, 15, 10, 0, 15, 10, 15, 10, 0,
+  ];
+
+  /// Compute total Gold earned across completed steps (tiles claimed),
+  /// clamped to the 1..60 reward table.
+  int calculateTotalGoldEarned({int? steps}) {
+    final completed = (steps ?? totalClaimedTiles()).clamp(0, _goldByStep.length);
+    int sum = 0;
+    for (int i = 0; i < completed; i++) {
+      sum += _goldByStep[i];
+    }
+    return sum;
+  }
+
+  int get goldEarned => calculateTotalGoldEarned();
+  int get goldAvailable => (goldEarned - state.goldSpent).clamp(0, 1 << 31);
+
+  Future<void> _persistGoldSpent() async {
+    try {
+      final user = _authService.currentUser;
+      if (user == null) return;
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'goldSpent': state.goldSpent,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
+  /// Spend gold and optionally create a voucher for the purchase.
+  /// Throws if insufficient gold.
+  Future<void> spendGold({required int amount, String? voucherTitle, String? voucherType}) async {
+    if (amount <= 0) return;
+    if (goldAvailable < amount) {
+      throw Exception('Not enough Gold');
+    }
+    state.goldSpent += amount;
+    notifyListeners();
+    await _persistGoldSpent();
+    if (voucherTitle != null || voucherType != null) {
+      await _createVoucher(title: voucherTitle, type: voucherType);
+    }
+  }
+
+  Future<void> _createVoucher({String? title, String? type}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final id = UniqueKey().toString();
+    final ref = FirebaseFirestore.instance.collection('vouchers').doc(id);
+    await ref.set({
+      'id': id,
+      'userId': user.uid,
+      'issuedAt': FieldValue.serverTimestamp(),
+      'claimed': false,
+      if (title != null) 'title': title,
+      if (type != null) 'type': type,
+      'source': 'marketplace',
+    });
+  }
 
   int mapUnderlayIndex = 0;
 
@@ -151,7 +265,7 @@ class GameController extends ChangeNotifier {
 
   // Track unlocked tiles for each underlay
   final Map<int, Set<String>> unlockedTilesByUnderlay = {
-    0: {'0,0'}, // map_underlay.png
+    0: {'0,0', 'A0,0'}, // map_underlay.png (center tile and label always claimed)
     1: <String>{}, // map_underlay2.png
     2: <String>{}, // map_underlay3.png
   };
@@ -176,6 +290,8 @@ class GameController extends ChangeNotifier {
   void _attachUserListener(User? user) {
     // Cancel any existing listener
     _userDocSub?.cancel();
+    _voucherClaimSub?.cancel();
+    _voucherClaimInitialized = false;
     if (user == null) return;
     final ref = FirebaseFirestore.instance.collection('users').doc(user.uid).withConverter<Map<String, dynamic>>(
       fromFirestore: (snap, _) => snap.data() ?? {},
@@ -188,6 +304,16 @@ class GameController extends ChangeNotifier {
       // internal `portfolio` (each app 'point' = 10000 portfolio units).
       final obtained = (data['totalPointsObtained'] is num) ? (data['totalPointsObtained'] as num).toInt() : ((data['points'] is num) ? (data['points'] as num).toInt() : null);
       if (obtained != null) {
+        // Detect increments in earned points to show congrats popup on recipient.
+        if (_lastKnownEarnedPoints != null && obtained > _lastKnownEarnedPoints!) {
+          final delta = obtained - _lastKnownEarnedPoints!;
+          specialPopupAsset = null; // no image for congrats, just message
+          specialMessage = delta == 1 ? 'CONGRATULATIONS! You gain an influance point' : 'CONGRATULATIONS! You gain $delta influance points';
+          specialPopupTimestamp = DateTime.now();
+          // Timer/auto-dismiss handled by SpecialPopupOverlay; notify UI now
+          notifyListeners();
+        }
+        _lastKnownEarnedPoints = obtained;
         state.portfolio = obtained * 10000;
       }
       // Prefer server-provided remaining points if present, otherwise recompute
@@ -199,7 +325,36 @@ class GameController extends ChangeNotifier {
         final totalUsed = _totalClaimedTiles();
         state.availablePoints = (totalEarned - totalUsed) < 0 ? 0 : (totalEarned - totalUsed);
       }
+      // Gold spent tracking
+      if (data['goldSpent'] is num) {
+        state.goldSpent = (data['goldSpent'] as num).toInt();
+      }
+      // Update portrait asset if present
+      if (data['portrait'] is String) {
+        state.portraitAsset = data['portrait'] as String;
+      }
       notifyListeners();
+    });
+
+    // Listen for vouchers being claimed for this user and show a popup on the grantee device
+    final voucherQuery = FirebaseFirestore.instance
+        .collection('vouchers')
+        .where('userId', isEqualTo: user.uid)
+        .where('claimed', isEqualTo: true);
+    _voucherClaimSub = voucherQuery.snapshots().listen((snap) {
+      // Skip the initial batch to avoid showing popups for already-claimed vouchers on app start
+      if (!_voucherClaimInitialized) {
+        _voucherClaimInitialized = true;
+        return;
+      }
+      // React only to newly added claimed vouchers (i.e., transitioned from unclaimed to claimed)
+      final hasNewlyClaimed = snap.docChanges.any((c) => c.type == DocumentChangeType.added);
+      if (hasNewlyClaimed) {
+        specialPopupAsset = null;
+        specialMessage = 'YOU HAVE REDEEMED A DRINK VOUCHER';
+        specialPopupTimestamp = DateTime.now();
+        notifyListeners();
+      }
     });
   }
 
@@ -216,44 +371,58 @@ class GameController extends ChangeNotifier {
   final totalEarned = (state.portfolio ~/ 10000);
   int totalUsed = _totalClaimedTiles();
     if (totalUsed >= totalEarned) {
-      print('Not enough earned points to claim tile $key (earned=$totalEarned, used=$totalUsed)');
+  debugPrint('Not enough earned points to claim tile $key (earned=$totalEarned, used=$totalUsed)');
       return;
     }
-    print('Claiming tile $key on underlay $currentUnderlay (earned=$totalEarned, used=$totalUsed)');
+  debugPrint('Claiming tile $key on underlay $currentUnderlay (earned=$totalEarned, used=$totalUsed)');
     tiles.add(key);
     // Note: availablePoints now reflects earned - used and is recomputed/persisted in saveUnlockedTilesToCloud()
-    // Show popup if claiming the special tile
-    if (specialHexQ == q && specialHexR == r) {
-      specialMessage = "You find an old chest, you open it and find a coupon for a free drink";
-      specialPopupAsset = "assets/images/keep.png";
+    // Show popup if claiming any special tile
+    final isSpecial = specialTiles.any((tile) => tile['q'] == q && tile['r'] == r);
+    if (isSpecial) {
+      specialPopupAsset = "assets/images/vouchers/freedrink.png";
       specialPopupTimestamp = DateTime.now();
+      // Generate and save a voucher when special tile is claimed
+      generateAndSaveVoucher();
+      // Remove the claimed special tile and force new list for UI update
+      specialTiles.removeWhere((tile) => tile['q'] == q && tile['r'] == r);
+      specialTiles = List.from(specialTiles);
       notifyListeners();
     }
-    // Randomize the next special hex after every unlock
-    randomizeSpecialHex();
-  notifyListeners();
-  // Persist per-user unlocked tiles map and update per-tile aggregate counts
-  saveUnlockedTilesToCloud();
-  // Fire-and-forget increment of aggregate counts for analytics/hover display
-  // Fire-and-forget increment of aggregate counts for analytics/hover display
-  _authService.claimTile(currentUnderlay, key, state.faction);
+  // Now that the tile is claimed, randomize the next special hexes, always excluding just-claimed tile
+  randomizeSpecialHex(exclude: key);
+    notifyListeners();
+    // Persist per-user unlocked tiles map and update per-tile aggregate counts
+    saveUnlockedTilesToCloud();
+    // Fire-and-forget increment of aggregate counts for analytics/hover display
+    _authService.claimTile(currentUnderlay, key, state.faction);
   }
 
-  void randomizeSpecialHex() {
-    // Special tile must be on an unclaimed and visible tile
-    final visible = getVisibleHexes(); // This should return Set<String> of visible hexes
+  void randomizeSpecialHex({String? exclude}) {
+    // Special tiles must be on unclaimed and visible tiles, and NOT A0,0 (0,0) on underlay 0
+    final visible = getVisibleHexes();
     final claimed = unlocked;
-    final unclaimedVisible = visible.difference(claimed);
+    var unclaimedVisible = visible.difference(claimed);
+    if (exclude != null) {
+      unclaimedVisible = unclaimedVisible.where((hex) => hex != exclude).toSet();
+    }
+    if (currentUnderlay == 0) {
+      unclaimedVisible = unclaimedVisible.where((hex) => hex != '0,0' && hex != 'A0,0').toSet();
+    }
+    final rand = math.Random();
+    final numSpecial = 2;
+    final unclaimedList = unclaimedVisible.toList();
+    // Always pick 2 new random special tiles from the available pool
     if (unclaimedVisible.isEmpty) {
-      specialHexQ = null;
-      specialHexR = null;
+      specialTiles = [];
+      notifyListeners();
       return;
     }
-  final rand = math.Random();
-    final chosen = unclaimedVisible.elementAt(rand.nextInt(unclaimedVisible.length));
-    final parts = chosen.split(',');
-    specialHexQ = int.parse(parts[0]);
-    specialHexR = int.parse(parts[1]);
+    final shuffled = unclaimedList..shuffle(rand);
+    specialTiles = shuffled.take(numSpecial).map((hex) {
+      final parts = hex.split(',');
+      return {'q': int.parse(parts[0]), 'r': int.parse(parts[1])};
+    }).toList();
     notifyListeners();
   }
 
@@ -514,10 +683,19 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Show a transient special popup message (optionally with an asset) and notify listeners.
+  void showSpecialMessage(String message, {String? asset}) {
+    specialPopupAsset = asset;
+    specialMessage = message;
+    specialPopupTimestamp = DateTime.now();
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _authSub?.cancel();
     _userDocSub?.cancel();
+    _voucherClaimSub?.cancel();
     super.dispose();
   }
 

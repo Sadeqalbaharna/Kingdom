@@ -10,7 +10,7 @@ class Axial {
   int get r => y;
 
   @override
-  bool operator ==(Object o) => o is Axial && o.x == x && o.y == y;
+  bool operator ==(Object other) => other is Axial && other.x == x && other.y == y;
   @override
   int get hashCode => Object.hash(x, y);
   @override
