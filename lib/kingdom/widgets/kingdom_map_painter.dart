@@ -93,14 +93,20 @@ class KingdomMapPainter extends CustomPainter {
     // Draw the map underlay FIRST so it is always visible
     if (underlay != null) {
       final paint = Paint();
-      final src = Rect.fromLTWH(0, 0, underlay!.width.toDouble(), underlay!.height.toDouble());
-      // Apply scale and pixel offset to the destination rect so callers can nudge the
-      // visible underlay without editing the source art. underlayScale is relative
-      // to the canvas size; underlayOffset is in logical pixels.
+      final srcW = underlay!.width.toDouble();
+      final srcH = underlay!.height.toDouble();
+      final src = Rect.fromLTWH(0, 0, srcW, srcH);
+
+      // Compute a uniform scale that covers the canvas (BoxFit.cover) while preserving
+      // the image aspect ratio, then apply the caller-provided underlayScale multiplier.
+      final scaleCover = (size.width / srcW > size.height / srcH)
+          ? (size.width / srcW)
+          : (size.height / srcH);
+      final uniform = scaleCover * underlayScale;
+      final drawW = srcW * uniform;
+      final drawH = srcH * uniform;
       final center = Offset(size.width / 2, size.height / 2) + underlayOffset;
-      final dstWidth = size.width * underlayScale;
-      final dstHeight = size.height * underlayScale;
-      final dst = Rect.fromCenter(center: center, width: dstWidth, height: dstHeight);
+      final dst = Rect.fromCenter(center: center, width: drawW, height: drawH);
       canvas.drawImageRect(underlay!, src, dst, paint);
     } else {
   final fallbackPaint = Paint()..color = Colors.grey.withValues(alpha: 0.05);
