@@ -38,6 +38,18 @@ class _Entry extends StatefulWidget {
 }
 
 class _EntryState extends State<_Entry> {
+  @override
+  void initState() {
+    super.initState();
+    // If we're already signed in (common after the first attempt on web),
+    // auto-continue after the first frame so the user doesn't have to tap again.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && mounted) {
+        await _continueAfterSignIn(context);
+      }
+    });
+  }
   Future<void> _continueAfterSignIn(BuildContext context) async {
     // Capture a navigator before any async gaps. Be resilient on web where
     // the local context may not have a Navigator in rare timing cases.
