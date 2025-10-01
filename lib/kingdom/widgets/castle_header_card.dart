@@ -15,7 +15,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 class CastleHeaderCard extends StatefulWidget {
   final GameState state;
-  const CastleHeaderCard({super.key, required this.state});
+  final bool compact;
+  const CastleHeaderCard({super.key, required this.state, this.compact = false});
 
   @override
   State<CastleHeaderCard> createState() => _CastleHeaderCardState();
@@ -64,6 +65,7 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
   Widget build(BuildContext context) {
   final ctrl = context.watch<GameController>();
   final s = widget.state;
+  final bool compact = widget.compact;
 
   // Resolve faction -> sigil asset path
   final factionKey = ctrl.state.faction.trim().toLowerCase();
@@ -81,9 +83,9 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
   // Removed unused totalEarnedPoints
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 0), // moved dashboard up by reducing vertical margin
+      margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 0), // compact keeps vertical minimal
       child: Padding(
-  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 0), // reduced vertical padding to fix overflow
+  padding: EdgeInsets.symmetric(horizontal: 5, vertical: compact ? 2 : 0),
           child: SingleChildScrollView(
             child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,21 +168,21 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                 const Spacer(),
                 // Points counter: remaining / total earned
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 10, vertical: compact ? 2 : 4),
                   decoration: BoxDecoration(
                     color: Colors.teal.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.star, color: Colors.teal, size: 18),
-                      const SizedBox(width: 6),
+                      Icon(Icons.star, color: Colors.teal, size: compact ? 16 : 18),
+                      SizedBox(width: compact ? 4 : 6),
                       // Show remaining/total (e.g., 3/5)
                       Builder(builder: (ctx) {
                         final totalEarned = (s.portfolio ~/ 10000);
                         final totalUsed = ctrl.totalClaimedTiles();
                         final remaining = (totalEarned - totalUsed) < 0 ? 0 : (totalEarned - totalUsed);
-                        return Text('$remaining/$totalEarned', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal));
+                        return Text('$remaining/$totalEarned', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal, fontSize: compact ? 12 : null));
                       }),
                     ],
                   ),
@@ -291,6 +293,7 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                     );
                   }
 
+                  final double qrSize = compact ? 64 : 80;
                   final qrBox = InkWell(
                     borderRadius: BorderRadius.circular(12),
                     onTap: () {
@@ -332,8 +335,8 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                       );
                     },
                     child: Container(
-                      width: 80,
-                      height: 80,
+                      width: qrSize,
+                      height: qrSize,
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
@@ -353,7 +356,7 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                         Transform.translate(
                           offset: const Offset(0, 4), // move badge slightly lower
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 8, vertical: compact ? 2 : 4),
                             decoration: BoxDecoration(
                               color: Colors.green.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(12),
@@ -361,14 +364,14 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                             ),
                             child: Text(
                               '$discount% discount',
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 12),
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: compact ? 11 : 12),
                             ),
                           ),
                         ),
                     ],
                   );
                 }),
-                const SizedBox(width: 16),
+                SizedBox(width: compact ? 10 : 16),
                 // If no sigil, keep info here; otherwise push portrait to the right
                 (factionSigilPath == null)
                     ? Expanded(
@@ -378,15 +381,15 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                             Text(
                               ctrl.currentUserDisplayName,
                               style: GoogleFonts.cinzel(
-                                fontSize: Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14,
+                                fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) - (compact ? 2 : 0),
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
-                            const SizedBox(height: 4), // add a couple pixels of space
+                            SizedBox(height: compact ? 2 : 4),
                             Text(
                               'Hero Level: ${s.fitness.level}',
                               style: GoogleFonts.cinzel(
-                                fontSize: Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14,
+                                fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) - (compact ? 2 : 0),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -394,23 +397,23 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                         ),
                       )
                     : const Spacer(),
-                const SizedBox(width: 12),
+                SizedBox(width: compact ? 8 : 12),
                 // Portrait on the right (opposite QR code) - larger
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: 100,
-                      height: 100,
-                      margin: const EdgeInsets.only(left: 8),
+                      width: compact ? 84 : 100,
+                      height: compact ? 84 : 100,
+                      margin: EdgeInsets.only(left: compact ? 6 : 8),
                       child: (portrait != null && portrait.isNotEmpty)
                           ? CircleAvatar(backgroundImage: AssetImage(portrait), radius: 32)
                           : const CircleAvatar(radius: 36, child: Icon(Icons.person, size: 36)),
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: compact ? 4 : 6),
                     // Coin counter under the portrait
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 8, vertical: compact ? 2 : 4),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFF7E6),
                         borderRadius: BorderRadius.circular(12),
@@ -420,10 +423,10 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(Icons.monetization_on, size: 16, color: Color(0xFFDAA520)),
-                          const SizedBox(width: 6),
+                          SizedBox(width: compact ? 4 : 6),
                           Builder(builder: (ctx) {
                             final gold = ctrl.goldAvailable;
-                            return Text('$gold Gold', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12));
+                            return Text('$gold Gold', style: TextStyle(fontWeight: FontWeight.w700, fontSize: compact ? 11 : 12));
                           }),
                         ],
                       ),
@@ -435,54 +438,54 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
 
             // Centered faction sigil (chosen in onboarding)
             if (factionSigilPath != null) ...[
-              const SizedBox(height: 1),
+              SizedBox(height: compact ? 0 : 1),
               Center(
                 child: Transform.translate(
                   // Raise the sigil (and info) a little more
-                  offset: const Offset(0, -118),
+                  offset: Offset(0, compact ? -96 : -118),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Transform.translate(
-                        offset: const Offset(0, -6), // nudge sigil a few pixels higher
+                        offset: Offset(0, compact ? -4 : -6), // nudge sigil a few pixels higher
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(16),
                           child: Image.asset(
                             factionSigilPath,
-                            width: 90,
-                            height: 90,
+                            width: compact ? 72 : 90,
+                            height: compact ? 72 : 90,
                             fit: BoxFit.contain,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: compact ? 2 : 4),
                       Transform.translate(
-                        offset: const Offset(0, -10), // nudge info slightly further up
+                        offset: Offset(0, compact ? -8 : -10), // nudge info slightly further up
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               ctrl.currentUserDisplayName,
                               style: GoogleFonts.cinzel(
-                                fontSize: Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14,
+                                fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) - (compact ? 2 : 0),
                                 fontWeight: FontWeight.w700,
                               ),
                               textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: 4), // small extra spacing between name and level
+                            SizedBox(height: compact ? 2 : 4), // small extra spacing between name and level
                             // Move hero level text up a touch more
                             Transform.translate(
-                              offset: const Offset(0, -6),
+                              offset: Offset(0, compact ? -4 : -6),
                               child: Text(
                                 'Hero Level: ${s.fitness.level}',
                                 style: GoogleFonts.cinzel(
-                                  fontSize: Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14,
+                                  fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) - (compact ? 2 : 0),
                                   fontWeight: FontWeight.w600,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
                             ),
-                            SizedBox(height: 12), // trimmed to keep layout tight
+                            SizedBox(height: compact ? 8 : 12), // trimmed to keep layout tight
                           ],
                         ),
                       ),
@@ -494,7 +497,7 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
             ],
 
             // Add a little bottom space so the card box extends below the info
-            const SizedBox(height: 20),
+            SizedBox(height: compact ? 12 : 20),
 
             // Map label is now displayed above the map in AppShell
           ],
