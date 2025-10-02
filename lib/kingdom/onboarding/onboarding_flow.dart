@@ -8,6 +8,7 @@ import 'auth_service.dart';
 import 'screens/google_sign_in_screen.dart';
 import 'screens/username_screen.dart';
 import 'screens/faction_screen.dart';
+import 'screens/password_screen.dart';
 
 class OnboardingFlow extends StatefulWidget {
   const OnboardingFlow({super.key});
@@ -73,9 +74,8 @@ class _EntryState extends State<_Entry> {
   user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
 
-  // Determine if email/password is already linked. If you signed in using
-  // email+password, this will already be present and we can skip the step.
-  // Password step removed: email/password users are fully handled by the sign-in action itself.
+  // Determine if email/password is already linked.
+  final hasPasswordProvider = user.providerData.any((p) => p.providerId == 'password');
 
     // Fetch profile data once to check username/faction
     Map<String, dynamic> data = {};
@@ -86,9 +86,11 @@ class _EntryState extends State<_Entry> {
       data = {};
     }
 
-  final hasUsername = (user.displayName != null && user.displayName!.trim().isNotEmpty) ||
-    (data['username'] is String && (data['username'] as String).trim().isNotEmpty) ||
-    (data['name'] is String && (data['name'] as String).trim().isNotEmpty);
+  // Require an in-app username stored in Firestore; do NOT treat Google
+  // account displayName as our username to avoid skipping the step.
+  final hasUsername =
+      (data['username'] is String && (data['username'] as String).trim().isNotEmpty) ||
+      (data['name'] is String && (data['name'] as String).trim().isNotEmpty);
     final hasFaction = data['faction'] is String && (data['faction'] as String).trim().isNotEmpty;
 
     Future<void> goToApp() async {
@@ -129,6 +131,20 @@ class _EntryState extends State<_Entry> {
           await goToApp();
           return;
         }
+      }
+    }
+
+    // If the account is not linked with a password provider yet, offer to set
+    // one so the user can log in via email later. Skip if already linked.
+    if (!hasPasswordProvider) {
+      if (!mounted) return;
+      final push = navigator ?? Navigator.of(context, rootNavigator: true);
+      try {
+        await push.push(MaterialPageRoute(
+          builder: (_) => PasswordScreen(onComplete: () {}),
+        ));
+      } catch (_) {
+        // Non-fatal; continue to next step
       }
     }
 

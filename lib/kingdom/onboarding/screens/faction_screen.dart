@@ -26,9 +26,11 @@ class _FactionScreenState extends State<FactionScreen> {
     try {
       await _auth.setFaction(_picked!);
       await Future.delayed(const Duration(milliseconds: 300));
-      // Defer final navigation to the supplied callback so the flow
-      // can handle platform specifics (pop to root, rebuild, etc.)
-      if (mounted) widget.onComplete();
+      // Notify and pop this step to return control to the flow
+      try { widget.onComplete(); } catch (_) {}
+      if (mounted) {
+        Navigator.of(context).maybePop(true);
+      }
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {

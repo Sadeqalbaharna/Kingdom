@@ -54,7 +54,10 @@ class _PasswordScreenState extends State<PasswordScreen> {
       if (hasPasswordProvider) {
         // User already linked with password; just update to the new one.
         await user.updatePassword(_pwd.text);
-        widget.onComplete();
+        try { widget.onComplete(); } catch (_) {}
+        if (mounted) {
+          Navigator.of(context).maybePop(true);
+        }
         return;
       }
       try {
@@ -63,12 +66,18 @@ class _PasswordScreenState extends State<PasswordScreen> {
           password: _pwd.text,
         );
         await user.linkWithCredential(credential);
-        widget.onComplete();
+        try { widget.onComplete(); } catch (_) {}
+        if (mounted) {
+          Navigator.of(context).maybePop(true);
+        }
       } catch (e) {
         // If provider already linked, treat as success and continue
         if (e.toString().contains('provider-already-linked')) {
           await user.updatePassword(_pwd.text);
-          widget.onComplete();
+          try { widget.onComplete(); } catch (_) {}
+          if (mounted) {
+            Navigator.of(context).maybePop(true);
+          }
         } else {
           setState(() => _error = e.toString());
         }

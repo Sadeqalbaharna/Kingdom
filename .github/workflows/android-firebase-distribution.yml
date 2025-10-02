@@ -10,8 +10,6 @@ on:
       - ".github/workflows/android-firebase-distribution.yml"
   workflow_dispatch:
 
-# ci: no-op touch to retrigger Testing build
-
 jobs:
   build-and-distribute:
     runs-on: ubuntu-latest

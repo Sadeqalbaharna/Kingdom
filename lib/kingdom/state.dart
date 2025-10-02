@@ -51,31 +51,31 @@ class GameController extends ChangeNotifier {
           }
         }
       } catch (_) {}
-      if (loaded.isNotEmpty) {
-        unlockedTilesByUnderlay.clear();
-        unlockedTilesByUnderlay.addAll({
-          0: {'0,0'}, // always keep center tile for map 0
-          1: <String>{},
-          2: <String>{},
-        });
-        loaded.forEach((k, v) {
-          // Always keep '0,0' for map 0
-          if (k == 0) {
-            unlockedTilesByUnderlay[0] = {'0,0', ...v};
-          } else {
-            unlockedTilesByUnderlay[k] = v;
-          }
-        });
-        // Compute availablePoints as (points earned from portfolio) - (points used for claimed tiles)
-        final totalPointsObtained = (state.portfolio ~/ 10000);
-        final totalPointsUsed = _totalClaimedTiles();
-        final totalPointsRemaining = totalPointsObtained - totalPointsUsed;
-        // Ensure available points never go negative
-        state.availablePoints = totalPointsRemaining < 0 ? 0 : totalPointsRemaining;
-        state.faction = faction;
-        state.portraitAsset = portraitAsset;
-        notifyListeners();
-      }
+
+      // Reset to defaults first to avoid cross-user bleed when cloud has no data yet
+      unlockedTilesByUnderlay.clear();
+      unlockedTilesByUnderlay.addAll({
+        0: {'0,0'}, // always keep center tile for map 0
+        1: <String>{},
+        2: <String>{},
+      });
+      // Overlay any loaded tiles
+      loaded.forEach((k, v) {
+        if (k == 0) {
+          unlockedTilesByUnderlay[0] = {'0,0', ...v};
+        } else {
+          unlockedTilesByUnderlay[k] = v;
+        }
+      });
+
+      // Compute availablePoints as (points earned from portfolio) - (points used for claimed tiles)
+      final totalPointsObtained = (state.portfolio ~/ 10000);
+      final totalPointsUsed = _totalClaimedTiles();
+      final totalPointsRemaining = totalPointsObtained - totalPointsUsed;
+      state.availablePoints = totalPointsRemaining < 0 ? 0 : totalPointsRemaining;
+      state.faction = faction;
+      state.portraitAsset = portraitAsset;
+      notifyListeners();
     } catch (e) {
       debugPrint('Failed to load unlocked tiles: $e');
     }
@@ -292,7 +292,28 @@ class GameController extends ChangeNotifier {
     _userDocSub?.cancel();
     _voucherClaimSub?.cancel();
     _voucherClaimInitialized = false;
-    if (user == null) return;
+    if (user == null) {
+      return;
+    }
+    // Reset local state immediately for the new user to avoid showing previous
+    // user data while cloud fetch is in-flight.
+    unlockedTilesByUnderlay.clear();
+    unlockedTilesByUnderlay.addAll({
+      0: {'0,0'},
+      1: <String>{},
+      2: <String>{},
+    });
+    state.availablePoints = 0;
+    state.portfolio = 0;
+    state.goldSpent = 0;
+    specialTiles = [];
+    _lastKnownEarnedPoints = null;
+    notifyListeners();
+
+    // Kick off a fresh load for this user
+    // (don't await; listeners below will also update when server data arrives)
+    // ignore: discarded_futures
+    loadUnlockedTilesFromCloud();
     final ref = FirebaseFirestore.instance.collection('users').doc(user.uid).withConverter<Map<String, dynamic>>(
       fromFirestore: (snap, _) => snap.data() ?? {},
       toFirestore: (m, _) => m,

@@ -120,7 +120,11 @@ class _UsernameScreenState extends State<UsernameScreen> {
       if (_selectedPortrait != null) {
         await _auth.setPortrait(_selectedPortrait!);
       }
-      widget.onComplete();
+      // Notify and pop this step so the flow can continue
+      try { widget.onComplete(); } catch (_) {}
+      if (mounted) {
+        Navigator.of(context).maybePop(true);
+      }
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
