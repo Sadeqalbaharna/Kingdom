@@ -35,44 +35,54 @@ jobs:
 
       - name: Create android/key.properties
         run: |
-          cat > android/key.properties <<'EOF'
-          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-          storeFile=app/keystore.jks
-          EOF
+          # Write signing config without heredoc indentation pitfalls
+          printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=app/keystore.jks\n" \
+            "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            "${{ secrets.ANDROID_KEY_PASSWORD }}" \
+            "${{ secrets.ANDROID_KEY_ALIAS }}" > android/key.properties
+
+      - name: "Preflight: signing keystore fingerprints (SHA-1/SHA-256)"
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          echo "Keystore alias: $ANDROID_KEY_ALIAS"
+          # List cert details for the provided alias (passwords are masked by Actions)
+          keytool -list -v -keystore android/app/keystore.jks -alias "$ANDROID_KEY_ALIAS" \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" -keypass "$ANDROID_KEY_PASSWORD" 2>/dev/null | \
+            grep -E 'SHA1:|SHA256:' || true
 
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Dump pub resolution diagnostics
+      - name: Dump pub resolution diagnostics (light)
         run: |
-          echo '--- pubspec.lock ---'
-          sed -n '1,200p' pubspec.lock || true
-          echo '--- .dart_tool/package_config.json ---'
-          sed -n '1,200p' .dart_tool/package_config.json || true
-          echo '--- list lib/kingdom/widgets ---'
-          ls -la lib/kingdom/widgets || true
+          echo 'pubspec.lock (head):'
+          sed -n '1,40p' pubspec.lock || true
 
       - name: Build release APK
         run: flutter build apk --release
+
+      - name: "Preflight: APK signing fingerprints (SHA-1/SHA-256)"
+        run: |
+          # Print the certificate used to sign the generated APK (non-fatal)
+          keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk 2>/dev/null | \
+            grep -E 'SHA1:|SHA256:' || true
 
       - name: Install Firebase CLI
         run: |
           curl -sL https://firebase.tools | bash
 
-      - name: "Preflight: verify APK and Firebase access"
+      - name: "Preflight: verify APK and Firebase CLI"
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          set -e
           echo "APK listing:"
           ls -l build/app/outputs/flutter-apk || true
           test -f build/app/outputs/flutter-apk/app-release.apk
           echo "Firebase CLI version:"
-          firebase --version
-          echo "Listing Firebase apps in project kingdom-ac44f (should include the Android app)"
-          firebase apps:list --project kingdom-ac44f --token "$FIREBASE_TOKEN" || true
+          firebase --version || true
 
       - name: "Preflight: print FIREBASE_APP_ID prefix"
         env:
