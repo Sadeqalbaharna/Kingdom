@@ -96,15 +96,15 @@ class _KingdomClickZoomState extends State<KingdomClickZoom> with TickerProvider
   Future<void> _loadAll() async {
     _load(_kUnderlay).then((img) {
       if (mounted) setState(() => _underlay = img);
-      debugPrint('Loaded underlay A (${_kUnderlay}): ${img.width}x${img.height}');
+      debugPrint('Loaded underlay A ($_kUnderlay): ${img.width}x${img.height}');
     });
     _load(_kUnderlay2).then((img) {
       if (mounted) setState(() => _underlay2 = img);
-      debugPrint('Loaded underlay B (${_kUnderlay2}): ${img.width}x${img.height}');
+      debugPrint('Loaded underlay B ($_kUnderlay2): ${img.width}x${img.height}');
     });
     _load(_kUnderlay3).then((img) {
       if (mounted) setState(() => _underlay3 = img);
-      debugPrint('Loaded underlay C (${_kUnderlay3}): ${img.width}x${img.height}');
+      debugPrint('Loaded underlay C ($_kUnderlay3): ${img.width}x${img.height}');
     });
     _load(_kKeep).then((img) {
       if (mounted) setState(() => _keep = img);
