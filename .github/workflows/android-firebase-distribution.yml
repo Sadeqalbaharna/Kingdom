@@ -35,7 +35,7 @@ jobs:
 
       - name: Create android/key.properties
         run: |
-          # Write signing config without heredoc indentation pitfalls
+          # Use printf to avoid heredoc indentation issues
           printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=app/keystore.jks\n" \
             "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
             "${{ secrets.ANDROID_KEY_PASSWORD }}" \
@@ -47,11 +47,13 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          echo "Keystore alias: $ANDROID_KEY_ALIAS"
-          # List cert details for the provided alias (passwords are masked by Actions)
-          keytool -list -v -keystore android/app/keystore.jks -alias "$ANDROID_KEY_ALIAS" \
-            -storepass "$ANDROID_KEYSTORE_PASSWORD" -keypass "$ANDROID_KEY_PASSWORD" 2>/dev/null | \
-            grep -E 'SHA1:|SHA256:' || true
+          {
+            echo "### Signing keystore fingerprints";
+            echo "Alias: $ANDROID_KEY_ALIAS";
+            keytool -list -v -keystore android/app/keystore.jks -alias "$ANDROID_KEY_ALIAS" \
+              -storepass "$ANDROID_KEYSTORE_PASSWORD" -keypass "$ANDROID_KEY_PASSWORD" 2>/dev/null | \
+              grep -E 'SHA1:|SHA256:' || true;
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Get dependencies
         run: flutter pub get
@@ -66,15 +68,17 @@ jobs:
 
       - name: "Preflight: APK signing fingerprints (SHA-1/SHA-256)"
         run: |
-          # Print the certificate used to sign the generated APK (non-fatal)
-          keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk 2>/dev/null | \
-            grep -E 'SHA1:|SHA256:' || true
+          {
+            echo "### APK signing fingerprints";
+            keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk 2>/dev/null | \
+              grep -E 'SHA1:|SHA256:' || true;
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Install Firebase CLI
         run: |
           curl -sL https://firebase.tools | bash
 
-      - name: "Preflight: verify APK and Firebase CLI"
+      - name: "Preflight: verify APK and Firebase access"
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
@@ -83,6 +87,8 @@ jobs:
           test -f build/app/outputs/flutter-apk/app-release.apk
           echo "Firebase CLI version:"
           firebase --version || true
+          echo "Listing Firebase apps in project kingdom-ac44f (should include the Android app)"
+          firebase apps:list --project kingdom-ac44f --token "$FIREBASE_TOKEN" || true
 
       - name: "Preflight: print FIREBASE_APP_ID prefix"
         env:
