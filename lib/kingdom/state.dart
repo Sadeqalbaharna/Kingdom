@@ -187,14 +187,15 @@ class GameController extends ChangeNotifier {
   List<Map<String, int>> specialTiles = [];
 
   // ---------- Rewards / Gold Tally ----------
-  // Gold awarded per step (1..60). Non-gold rewards and discounts are 0.
+  // Gold awarded per step (1..60). Non-gold rewards (vouchers/discounts) are 0.
+  // Must match rewardPath60() in rewards.dart
   static const List<int> _goldByStep = [
-    // 1..20 (Tier I)
-    5, 5, 10, 5, 0, 10, 5, 10, 5, 0, 10, 5, 10, 5, 0, 10, 5, 10, 5, 0,
-    // 21..40 (Tier II)
-    10, 5, 10, 5, 0, 10, 5, 10, 5, 0, 10, 5, 10, 5, 0, 10, 5, 10, 5, 0,
-    // 41..60 (Tier III)
-    10, 5, 10, 5, 0, 10, 5, 10, 5, 0, 15, 10, 15, 10, 0, 15, 10, 15, 10, 0,
+    // 1..20 (Tier I): 5 gold (1-4), voucher@5, 5 gold (6-9), voucher@10, 5 gold (11-14), voucher@15, 10 gold (16-19), discount@20
+    5, 5, 5, 5, 0,  5, 5, 5, 5, 0,  5, 5, 5, 5, 0,  10, 10, 10, 10, 0,
+    // 21..40 (Tier II): 10 gold (21-24), voucher@25, 10 gold (26-29), voucher@30, 15 gold (31-34), voucher@35, 15 gold (36-39), discount@40
+    10, 10, 10, 10, 0,  10, 10, 10, 10, 0,  15, 15, 15, 15, 0,  15, 15, 15, 15, 0,
+    // 41..60 (Tier III): 15 gold (41-44), voucher@45, 20 gold (46-49), voucher@50, 20 gold (51-54), voucher@55, 20 gold (56-59), discount@60
+    15, 15, 15, 15, 0,  20, 20, 20, 20, 0,  20, 20, 20, 20, 0,  20, 20, 20, 20, 0,
   ];
 
   /// Compute total Gold earned across completed steps (tiles claimed),
