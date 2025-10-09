@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'widgets/voucher_tab.dart';
-import 'widgets/enemies_tab.dart';
 import 'widgets/hero_tab.dart';
 // import 'widgets/armors_tab.dart';
 import 'widgets/marketplace_tab.dart';
@@ -56,8 +55,9 @@ class _MapAndCheckboxRowState extends State<_MapAndCheckboxRow> {
               ),
               // Map selector (center)
               Expanded(
-                child: Consumer<GameController>(
-                  builder: (context, ctrl, _) {
+                child: Center(
+                  child: Consumer<GameController>(
+                    builder: (context, ctrl, _) {
                     // Re-enable gating: 20 tiles for map 1, 40 for map 2
                     final totalClaimed = ctrl.totalClaimedTiles();
                     final maps = [
@@ -74,7 +74,7 @@ class _MapAndCheckboxRowState extends State<_MapAndCheckboxRow> {
                         'lockMsg': 'Unlocks at 20 tiles',
                       },
                       {
-                        'label': 'Arrid Wilderness',
+                        'label': 'Arid Wilderness',
                         'img': 'assets/images/map_underlay3.png',
                         'unlocked': totalClaimed >= 40,
                         'lockMsg': 'Unlocks at 40 tiles',
@@ -187,6 +187,7 @@ class _MapAndCheckboxRowState extends State<_MapAndCheckboxRow> {
                       ),
                     );
                   },
+                ),
                 ),
               ),
               // Show Labels checkbox (right) - debug only with red dot indicator
@@ -336,7 +337,7 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
                   case 1:
                     return 'The Coast';
                   case 2:
-                    return 'Arrid Wilderness';
+                    return 'Arid Wilderness';
                   default:
                     return 'Town of Departure';
                 }
@@ -394,7 +395,6 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
   List<Widget> get _pages => [
     Builder(builder: dashboardPage),
     const VoucherTab(),
-    const EnemiesTab(),
     const HeroTab(),
     const MarketplaceTab(),
   ];
@@ -489,11 +489,10 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
                       });
                     },
                     items: const [
-                      BottomNavigationBarItem(icon: Icon(Icons.dashboard, size: 22), label: 'Home'),
-                      BottomNavigationBarItem(icon: Icon(Icons.card_giftcard, size: 22), label: 'Vouchers'),
-                      BottomNavigationBarItem(icon: Icon(Icons.warning_amber_rounded, size: 22), label: 'Enemies'),
-                      BottomNavigationBarItem(icon: Icon(Icons.person, size: 22), label: 'Hero'),
-                      BottomNavigationBarItem(icon: Icon(Icons.storefront, size: 22), label: 'Market'),
+                      BottomNavigationBarItem(icon: Icon(Icons.dashboard, size: 26), label: 'Home'),
+                      BottomNavigationBarItem(icon: Icon(Icons.card_giftcard, size: 26), label: 'Vouchers'),
+                      BottomNavigationBarItem(icon: Icon(Icons.person, size: 26), label: 'Hero'),
+                      BottomNavigationBarItem(icon: Icon(Icons.storefront, size: 26), label: 'Market'),
                     ],
                     type: BottomNavigationBarType.fixed,
                     selectedItemColor: Colors.teal[700],

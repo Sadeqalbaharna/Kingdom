@@ -65,7 +65,6 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
   Widget build(BuildContext context) {
   final ctrl = context.watch<GameController>();
   final s = widget.state;
-  final bool compact = widget.compact;
 
   // Resolve faction -> sigil asset path
   final factionKey = ctrl.state.faction.trim().toLowerCase();
@@ -83,11 +82,10 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
   // Removed unused totalEarnedPoints
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 0), // compact keeps vertical minimal
+      margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 0),
       child: Padding(
-  padding: EdgeInsets.symmetric(horizontal: 5, vertical: compact ? 2 : 0),
-          child: SingleChildScrollView(
-            child: Column(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -168,21 +166,43 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                 const Spacer(),
                 // Points counter: remaining / total earned
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 10, vertical: compact ? 2 : 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: Colors.teal.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.star, color: Colors.teal, size: compact ? 16 : 18),
-                      SizedBox(width: compact ? 4 : 6),
+                      const Icon(Icons.star, color: Colors.teal, size: 16),
+                      const SizedBox(width: 4),
                       // Show remaining/total (e.g., 3/5)
                       Builder(builder: (ctx) {
                         final totalEarned = (s.portfolio ~/ 10000);
                         final totalUsed = ctrl.totalClaimedTiles();
                         final remaining = (totalEarned - totalUsed) < 0 ? 0 : (totalEarned - totalUsed);
-                        return Text('$remaining/$totalEarned', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal, fontSize: compact ? 12 : null));
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '$remaining/$totalEarned',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.teal,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            const Text(
+                              'Adventure Points',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.teal,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        );
                       }),
                     ],
                   ),
@@ -262,247 +282,250 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
 
             // (Reverted) Centered faction sigil row removed
 
-            Row(
-              children: [
-                Builder(builder: (ctx) {
-                  final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-                  final payload = convert.jsonEncode({'uid': uid.isEmpty ? 'no-uid' : uid, 'name': ctrl.currentUserDisplayName});
-                  // Determine earned permanent discount using reward path definition
-                  int discount = 0;
-                  final completed = ctrl.totalClaimedTiles();
-                  final rewards = rewardPath60();
-                  for (final r in rewards) {
-                    if (r.step <= completed && r.discountPercent != null) {
-                      discount = r.discountPercent!;
-                    }
-                  }
-
-                  Widget inner;
-                  if (uid.isEmpty) {
-                    inner = Center(
-                      child: Text(
-                        'No UID',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                        textAlign: TextAlign.center,
-                      ),
-                    );
-                  } else {
-                    inner = QrImageView(
-                      data: payload,
-                      version: QrVersions.auto,
-                    );
-                  }
-
-                  final double qrSize = compact ? 64 : 80;
-                  final qrBox = InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (dctx) {
-                          Widget big;
-                          if (uid.isEmpty) {
-                            big = SizedBox(
-                              width: 200,
-                              height: 200,
-                              child: Center(child: Text('UID not available', style: TextStyle(color: Colors.black54))),
-                            );
-                          } else {
-                            big = SizedBox(
-                              width: 200,
-                              height: 200,
-                              child: QrImageView(
-                                data: payload,
-                                version: QrVersions.auto,
-                              ),
-                            );
-                          }
-                          return AlertDialog(
-                            content: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                border: Border.all(color: Colors.black26),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: big,
-                            ),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.of(dctx).pop(), child: const Text('Close')),
-                            ],
-                          );
-                        },
-                      );
-                    },
-                    child: Container(
-                      width: qrSize,
-                      height: qrSize,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.black12),
-                      ),
-                      child: inner,
-                    ),
-                  );
-
-                  // Return QR with optional discount badge under it
-                  return Column(
+            // Main content row with QR, sigil, and portrait
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Left: QR code with discount badge
+                  Column(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      qrBox,
-                      const SizedBox(height: 6),
-                      if (discount > 0)
-                        Transform.translate(
-                          offset: const Offset(0, 4), // move badge slightly lower
-                          child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 8, vertical: compact ? 2 : 4),
+                      Builder(builder: (ctx) {
+                    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+                    final payload = convert.jsonEncode({'uid': uid.isEmpty ? 'no-uid' : uid, 'name': ctrl.currentUserDisplayName});
+                    // Determine earned permanent discount using reward path definition
+                    int discount = 0;
+                    final completed = ctrl.totalClaimedTiles();
+                    final rewards = rewardPath60();
+                    for (final r in rewards) {
+                      if (r.step <= completed && r.discountPercent != null) {
+                        discount = r.discountPercent!;
+                      }
+                    }
+
+                    Widget inner;
+                    if (uid.isEmpty) {
+                      inner = Center(
+                        child: Text(
+                          'No UID',
+                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                          textAlign: TextAlign.center,
+                        ),
+                      );
+                    } else {
+                      inner = QrImageView(
+                        data: payload,
+                        version: QrVersions.auto,
+                      );
+                    }
+
+                    final double qrSize = 70;
+                    final qrBox = InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          builder: (dctx) {
+                            Widget big;
+                            if (uid.isEmpty) {
+                              big = const SizedBox(
+                                width: 240,
+                                height: 240,
+                                child: Center(
+                                  child: Text(
+                                    'UID not available',
+                                    style: TextStyle(color: Colors.black54),
+                                  ),
+                                ),
+                              );
+                            } else {
+                              big = SizedBox(
+                                width: 240,
+                                height: 240,
+                                child: Center(
+                                  child: QrImageView(
+                                    data: payload,
+                                    version: QrVersions.auto,
+                                    size: 220,
+                                  ),
+                                ),
+                              );
+                            }
+                            return AlertDialog(
+                              contentPadding: const EdgeInsets.all(20),
+                              content: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  border: Border.all(color: Colors.black26),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: big,
+                              ),
+                              actions: [
+                                Center(
+                                  child: IconButton(
+                                    icon: const Icon(Icons.close, size: 28),
+                                    onPressed: () => Navigator.of(dctx).pop(),
+                                    tooltip: 'Close',
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                      child: Container(
+                        width: qrSize,
+                        height: qrSize,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.black12),
+                        ),
+                        child: inner,
+                      ),
+                    );
+
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        qrBox,
+                        if (discount > 0) ...[
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
                               color: Colors.green.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.green.withValues(alpha: 0.3), width: 1.5),
                             ),
-                            child: Text(
-                              '$discount% discount',
-                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: compact ? 11 : 12),
-                            ),
-                          ),
-                        ),
-                    ],
-                  );
-                }),
-                SizedBox(width: compact ? 10 : 16),
-                // If no sigil, keep info here; otherwise push portrait to the right
-                (factionSigilPath == null)
-                    ? Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              ctrl.currentUserDisplayName,
-                              style: GoogleFonts.cinzel(
-                                fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) - (compact ? 2 : 0),
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            SizedBox(height: compact ? 2 : 4),
-                            Text(
-                              'Hero Level: ${s.fitness.level}',
-                              style: GoogleFonts.cinzel(
-                                fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) - (compact ? 2 : 0),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : const Spacer(),
-                SizedBox(width: compact ? 8 : 12),
-                // Portrait on the right (opposite QR code) - larger
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: compact ? 84 : 100,
-                      height: compact ? 84 : 100,
-                      margin: EdgeInsets.only(left: compact ? 6 : 8),
-                      child: (portrait != null && portrait.isNotEmpty)
-                          ? CircleAvatar(backgroundImage: AssetImage(portrait), radius: 32)
-                          : const CircleAvatar(radius: 36, child: Icon(Icons.person, size: 36)),
-                    ),
-                    SizedBox(height: compact ? 4 : 6),
-                    // Coin counter under the portrait
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 8, vertical: compact ? 2 : 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF7E6),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFFFE4A3)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.monetization_on, size: 16, color: Color(0xFFDAA520)),
-                          SizedBox(width: compact ? 4 : 6),
-                          Builder(builder: (ctx) {
-                            final gold = ctrl.goldAvailable;
-                            return Text('$gold Gold', style: TextStyle(fontWeight: FontWeight.w700, fontSize: compact ? 11 : 12));
-                          }),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-
-            // Centered faction sigil (chosen in onboarding)
-            if (factionSigilPath != null) ...[
-              SizedBox(height: compact ? 0 : 1),
-              Center(
-                child: Transform.translate(
-                  // Raise the sigil (and info) a little more
-                  offset: Offset(0, compact ? -96 : -118),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Transform.translate(
-                        offset: Offset(0, compact ? -4 : -6), // nudge sigil a few pixels higher
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Image.asset(
-                            factionSigilPath,
-                            width: compact ? 72 : 90,
-                            height: compact ? 72 : 90,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: compact ? 2 : 4),
-                      Transform.translate(
-                        offset: Offset(0, compact ? -8 : -10), // nudge info slightly further up
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              ctrl.currentUserDisplayName,
-                              style: GoogleFonts.cinzel(
-                                fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) - (compact ? 2 : 0),
-                                fontWeight: FontWeight.w700,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            SizedBox(height: compact ? 2 : 4), // small extra spacing between name and level
-                            // Move hero level text up a touch more
-                            Transform.translate(
-                              offset: Offset(0, compact ? -4 : -6),
-                              child: Text(
-                                'Hero Level: ${s.fitness.level}',
-                                style: GoogleFonts.cinzel(
-                                  fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) - (compact ? 2 : 0),
-                                  fontWeight: FontWeight.w600,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.local_offer, size: 16, color: Colors.green),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$discount% off',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                    color: Color(0xFF2E7D32),
+                                  ),
                                 ),
-                                textAlign: TextAlign.center,
-                              ),
+                              ],
                             ),
-                            SizedBox(height: compact ? 8 : 12), // trimmed to keep layout tight
-                          ],
-                        ),
-                      ),
-                      // Progress bar moved under map unlock buttons (in AppShell)
+                          ),
+                        ],
+                      ],
+                    );
+                  }),
                     ],
                   ),
-                ),
+                  
+                  const SizedBox(width: 12),
+                  
+                  // Center: Faction sigil with name and hero level
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (factionSigilPath != null) ...[
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Image.asset(
+                              factionSigilPath,
+                              width: 70,
+                              height: 70,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                        ],
+                        Text(
+                          ctrl.currentUserDisplayName,
+                          style: GoogleFonts.cinzel(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Hero Level: ${s.fitness.level}',
+                          style: GoogleFonts.cinzel(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(width: 12),
+                  
+                  // Right: Portrait with gold counter
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 85,
+                        height: 85,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.black12, width: 2),
+                        ),
+                        child: (portrait != null && portrait.isNotEmpty)
+                            ? CircleAvatar(
+                                backgroundImage: AssetImage(portrait),
+                                radius: 40,
+                              )
+                            : const CircleAvatar(
+                                radius: 40,
+                                child: Icon(Icons.person, size: 40),
+                              ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF7E6),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFFE4A3), width: 1.5),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.monetization_on, size: 16, color: Color(0xFFDAA520)),
+                            const SizedBox(width: 4),
+                            Builder(builder: (ctx) {
+                              final gold = ctrl.goldAvailable;
+                              return Text(
+                                '$gold Gold',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  color: Color(0xFF8B7500),
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-
-            // Add a little bottom space so the card box extends below the info
-            SizedBox(height: compact ? 12 : 20),
+            ),
 
             // Map label is now displayed above the map in AppShell
           ],
-            ),
-          ),
+        ),
       ),
     );
   }

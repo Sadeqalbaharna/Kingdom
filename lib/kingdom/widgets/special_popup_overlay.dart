@@ -196,7 +196,7 @@ class MapUnderlayChooser extends StatelessWidget {
     const List<String> titles = [
       'Town of Departure',
       'The Coast',
-      'Arrid Wilderness',
+      'Arid Wilderness',
     ];
 
     return Center(

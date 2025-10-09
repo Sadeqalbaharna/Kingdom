@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:provider/provider.dart';
+import '../state.dart';
 // Removed scanner page import as the scan button is no longer present on this screen.
 
 class VoucherTab extends StatelessWidget {
@@ -66,21 +68,48 @@ class VoucherTab extends StatelessWidget {
                       );
                     },
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.add),
-                    tooltip: 'Generate Voucher',
-                    onPressed: () async {
-                      try {
-                        await generateAndSaveVoucher();
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voucher generated!')));
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                        }
-                      }
-                    },
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // DEBUG: Delete all vouchers button
+                      IconButton(
+                        icon: const Icon(Icons.delete_forever, color: Colors.red),
+                        tooltip: 'DEBUG: Delete All Vouchers',
+                        onPressed: () async {
+                          final controller = context.read<GameController>();
+                          try {
+                            await controller.deleteAllVouchers();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('All vouchers deleted!'))
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e'))
+                              );
+                            }
+                          }
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.add),
+                        tooltip: 'Generate Voucher',
+                        onPressed: () async {
+                          try {
+                            await generateAndSaveVoucher();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voucher generated!')));
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                            }
+                          }
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),

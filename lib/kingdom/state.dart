@@ -30,6 +30,34 @@ class GameController extends ChangeNotifier {
       'claimed': false,
     });
   }
+  
+  /// DEBUG: Delete all vouchers for the current user and refund all gold
+  Future<void> deleteAllVouchers() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    
+    final query = FirebaseFirestore.instance
+        .collection('vouchers')
+        .where('userId', isEqualTo: user.uid);
+    
+    final snapshot = await query.get();
+    debugPrint('Deleting ${snapshot.docs.length} vouchers for user ${user.uid}');
+    
+    // Delete all vouchers in a batch
+    final batch = FirebaseFirestore.instance.batch();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+    
+    // Reset goldSpent to 0 (refund all gold)
+    state.goldSpent = 0;
+    notifyListeners();
+    await _persistGoldSpent();
+    
+    debugPrint('All vouchers deleted and gold refunded (goldSpent reset to 0)');
+  }
+  
   Future<void> setFaction(String faction) async => await _authService.setFaction(faction);
   Future<String?> get faction async => await _authService.getFaction();
   String get currentUserDisplayName => _authService.currentUser?.displayName ?? "Player";
@@ -209,7 +237,11 @@ class GameController extends ChangeNotifier {
     return sum;
   }
 
-  int get goldEarned => calculateTotalGoldEarned();
+  int get goldEarned {
+    final earned = calculateTotalGoldEarned();
+    debugPrint('goldEarned: $earned (tiles: ${totalClaimedTiles()}, spent: ${state.goldSpent})');
+    return earned;
+  }
   int get goldAvailable => (goldEarned - state.goldSpent).clamp(0, 1 << 31);
 
   Future<void> _persistGoldSpent() async {
@@ -350,6 +382,14 @@ class GameController extends ChangeNotifier {
       // Gold spent tracking
       if (data['goldSpent'] is num) {
         state.goldSpent = (data['goldSpent'] as num).toInt();
+        // Safety: cap goldSpent at what could have been earned (avoid corrupt data)
+        final maxPossibleGold = calculateTotalGoldEarned(steps: _totalClaimedTiles());
+        if (state.goldSpent > maxPossibleGold) {
+          debugPrint('WARNING: goldSpent (${state.goldSpent}) exceeds max possible ($maxPossibleGold). Resetting to 0.');
+          state.goldSpent = 0;
+          // Persist the correction
+          _persistGoldSpent();
+        }
       }
       // Update portrait asset if present
       if (data['portrait'] is String) {
@@ -396,7 +436,8 @@ class GameController extends ChangeNotifier {
   debugPrint('Not enough earned points to claim tile $key (earned=$totalEarned, used=$totalUsed)');
       return;
     }
-  debugPrint('Claiming tile $key on underlay $currentUnderlay (earned=$totalEarned, used=$totalUsed)');
+  final goldCalc = calculateTotalGoldEarned(steps: totalUsed + 1);
+  debugPrint('Claiming tile $key on underlay $currentUnderlay (earned=$totalEarned, used=$totalUsed, goldAfterClaim=$goldCalc)');
     tiles.add(key);
     // Note: availablePoints now reflects earned - used and is recomputed/persisted in saveUnlockedTilesToCloud()
     // Show popup if claiming any special tile
