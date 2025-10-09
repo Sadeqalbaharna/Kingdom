@@ -160,14 +160,17 @@ class _MapProgressBarState extends State<MapProgressBar> {
       final bool isActive = nodeConfig.active ?? (i < widget.filledNodes);
   final int displayedStep = widget.startStep + i; // absolute step number
 
-      Widget circle = Container(
-        width: isBig ? 16 : 8,
-        height: isBig ? 16 : 8,
-        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        decoration: BoxDecoration(
-          color: isActive ? Colors.green : Colors.grey[300],
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.black26, width: isBig ? 2 : 1),
+      Widget circle = Transform.rotate(
+        angle: 3.14159 / 4, // 45 degrees in radians (π/4)
+        child: Container(
+          width: isBig ? 14 : 8,
+          height: isBig ? 14 : 8,
+          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          decoration: BoxDecoration(
+            color: isActive ? Colors.green : Colors.grey[300],
+            borderRadius: BorderRadius.circular(2),
+            border: Border.all(color: Colors.black26, width: isBig ? 2 : 1),
+          ),
         ),
       );
 

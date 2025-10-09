@@ -214,6 +214,37 @@ class _KingdomClickZoomState extends State<KingdomClickZoom> with TickerProvider
                   },
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
+                    onDoubleTap: () async {
+                      // Double-tap to instantly show tooltip (mobile-friendly)
+                      if (_lastPointerGlobal == null) return;
+                      final RenderBox box = context.findRenderObject() as RenderBox;
+                      final localPos = box.globalToLocal(_lastPointerGlobal!);
+                      final center = Offset(canvasSize.width / 2, canvasSize.height / 2);
+                      final r = _tileSize;
+                      String? foundKey;
+                      for (int q = -10; q <= 10; q++) {
+                        for (int r_ = -10; r_ <= 10; r_++) {
+                          if ((q).abs() + (r_).abs() + (-q - r_).abs() > 20) continue;
+                          final hexCenter = Offset(
+                            center.dx + r * (3.0 / 2.0 * q),
+                            center.dy + r * (sqrt(3) / 2.0 * q + sqrt(3) * r_),
+                          );
+                          final hexBounds = Rect.fromCircle(center: hexCenter, radius: r);
+                          if (hexBounds.contains(localPos)) {
+                            foundKey = '$q,$r_';
+                            break;
+                          }
+                        }
+                        if (foundKey != null) break;
+                      }
+                      if (foundKey != null) {
+                        try {
+                          final counts = await gc.fetchTileCounts(widget.mapUnderlayIndex, foundKey);
+                          if (!mounted) return;
+                          _insertOverlay(_lastPointerGlobal!, foundKey, counts);
+                        } catch (_) {}
+                      }
+                    },
                     onLongPressStart: (details) {
                       // start a 2s timer for long-press tooltip
                       _lastPointerGlobal = details.globalPosition;
@@ -253,6 +284,7 @@ class _KingdomClickZoomState extends State<KingdomClickZoom> with TickerProvider
                       _removeOverlay();
                     },
                     onTapDown: (details) {
+                      _lastPointerGlobal = details.globalPosition;
                       _hoverTimer?.cancel();
                       _removeOverlay();
                       final RenderBox box = context.findRenderObject() as RenderBox;
