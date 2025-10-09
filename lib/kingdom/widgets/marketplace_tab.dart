@@ -9,12 +9,12 @@ class MarketplaceTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = context.watch<GameController>();
     final items = [
-      _MarketItem('Fries / side', 10, 'fries', '🍟'),
-      _MarketItem('Soft drink', 15, 'soft_drink', '🥤'),
-      _MarketItem('Dessert', 20, 'dessert', '🍰'),
-      _MarketItem('Appetizer', 25, 'appetizer', '🍗'),
-      _MarketItem('Potion (mocktail/cocktail)', 30, 'potion', '🧪'),
-      _MarketItem('Main course', 50, 'main_course', '🍲'),
+      _MarketItem('Fries / side', 10, 'fries', 'assets/images/vouchers/starter.png'),
+      _MarketItem('Soft drink', 15, 'soft_drink', 'assets/images/vouchers/soda.png'),
+      _MarketItem('Dessert', 20, 'dessert', 'assets/images/vouchers/dessert.png'),
+      _MarketItem('Appetizer', 25, 'appetizer', 'assets/images/vouchers/starter.png'),
+      _MarketItem('Potion (mocktail/cocktail)', 30, 'potion', 'assets/images/vouchers/drink.png'),
+      _MarketItem('Main course', 50, 'main_course', 'assets/images/vouchers/main.png'),
     ];
 
     return Column(
@@ -40,7 +40,16 @@ class MarketplaceTab extends StatelessWidget {
                 elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey.shade200)),
                 child: ListTile(
-                  leading: Text(it.emoji, style: const TextStyle(fontSize: 24)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      it.imagePath,
+                      width: 64,
+                      height: 64,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                   title: Text(it.title),
                   subtitle: Text('${it.cost} Gold'),
                   trailing: FilledButton.tonal(
@@ -105,6 +114,6 @@ class _MarketItem {
   final String title;
   final int cost;
   final String type;
-  final String emoji;
-  _MarketItem(this.title, this.cost, this.type, this.emoji);
+  final String imagePath;
+  _MarketItem(this.title, this.cost, this.type, this.imagePath);
 }

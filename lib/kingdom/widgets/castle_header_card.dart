@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert' as convert;
 import 'package:provider/provider.dart';
-import 'dart:async';
 import '../state.dart';
 import '../models.dart';
 import '../rewards.dart';
@@ -39,26 +38,6 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
   void _apply(BuildContext context, int sign) {
   final ctrl = context.read<GameController>();
   ctrl.addPoints(sign);
-  }
-
-  /// Fetch percentages for underlays 0..2 and return a map underlay->(faction->percent)
-  Future<Map<int, Map<String, double>>> _fetchAllUnderlayPercentages(GameController ctrl) async {
-    final Map<int, Map<String, double>> out = {};
-    for (int i = 0; i < 3; i++) {
-      try {
-        final p = await ctrl.fetchUnderlayPercentages(i);
-        out[i] = p;
-      } catch (e) {
-        out[i] = {};
-      }
-    }
-    return out;
-  }
-
-  String _prettyFaction(String f) {
-    final s = f.trim();
-    if (s.isEmpty) return 'Unknown';
-    return s[0].toUpperCase() + (s.length > 1 ? s.substring(1) : '');
   }
 
   @override
@@ -109,77 +88,10 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
               children: [
                 // Account icon at top left
                 AccountWidget(),
-                SizedBox(width: isMobile ? 0 : 1),
-                SizedBox(width: isMobile ? 0 : 1),
-                // Map ownership button (moved left)
-                Tooltip(
-                  message: 'Map ownership percentages',
-                  child: IconButton(
-                    icon: Icon(Icons.map_outlined, size: isMobile ? 20 : 24),
-                    splashRadius: isMobile ? 16 : 20,
-                    onPressed: () async {
-                      // Show dialog while we fetch percentages for each underlay
-                      showDialog<void>(
-                        context: context,
-                        barrierDismissible: true,
-                        builder: (dctx) {
-                          return FutureBuilder<Map<int, Map<String, double>>>(
-                            future: _fetchAllUnderlayPercentages(ctrl),
-                            builder: (ctx, snap) {
-                              if (snap.connectionState != ConnectionState.done) {
-                                return AlertDialog(
-                                  title: const Text('Map ownership'),
-                                  content: const SizedBox(height: 80, child: Center(child: CircularProgressIndicator())),
-                                );
-                              }
-                              final data = snap.data ?? {};
-                              return AlertDialog(
-                                title: const Text('Map ownership'),
-                                content: SizedBox(
-                                  width: 360,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: List.generate(3, (i) {
-                                      final mapData = data[i] ?? {};
-                                      if (mapData.isEmpty) {
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 6),
-                                          child: Text('Map $i: No claimed tiles'),
-                                        );
-                                      }
-                                      final rows = <Widget>[];
-                                      mapData.forEach((faction, pct) {
-                                        rows.add(Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [Text(_prettyFaction(faction)), Text('${pct.toStringAsFixed(1)}%')],
-                                        ));
-                                      });
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 6),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [Text('Map $i:'), const SizedBox(height: 6), ...rows],
-                                        ),
-                                      );
-                                    }),
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(onPressed: () => Navigator.of(dctx).pop(), child: const Text('Close')),
-                                ],
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
                 const Spacer(),
                 // Points counter: remaining / total earned
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 6 : 8, vertical: isMobile ? 2 : 3),
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: isMobile ? 2 : 3),
                   decoration: BoxDecoration(
                     color: Colors.teal.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
@@ -187,8 +99,8 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.star, color: Colors.teal, size: isMobile ? 14 : 16),
-                      SizedBox(width: isMobile ? 3 : 4),
+                      Icon(Icons.star, color: Colors.teal, size: isMobile ? 12 : 16),
+                      SizedBox(width: isMobile ? 2 : 4),
                       // Show remaining/total (e.g., 3/5)
                       Builder(builder: (ctx) {
                         final totalEarned = (s.portfolio ~/ 10000);
@@ -202,16 +114,16 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.teal,
-                                fontSize: isMobile ? 11 : 13,
+                                fontSize: isMobile ? 9 : 13,
                               ),
                             ),
                             if (!isMobile) ...[
-                              SizedBox(width: isMobile ? 3 : 4),
+                              SizedBox(width: 4),
                               Text(
                                 'Adventure Points',
                                 style: TextStyle(
                                   color: Colors.teal.shade700,
-                                  fontSize: isMobile ? 9 : 11,
+                                  fontSize: 11,
                                 ),
                               ),
                             ],
@@ -223,35 +135,35 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                 ),
                 // Move + and - buttons up here (debug only) with red dot indicator
                 if (kDebugMode) ...[
-                  const SizedBox(width: 6),
+                  SizedBox(width: isMobile ? 2 : 6),
                   // tiny red dot to mark debug feature
-                  Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
-                  const SizedBox(width: 6),
+                  if (!isMobile) Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+                  if (!isMobile) const SizedBox(width: 6),
                   Tooltip(
                     message: 'Add',
                     child: FilledButton(
                       onPressed: () => _apply(context, 1),
                       style: FilledButton.styleFrom(
-                        minimumSize: const Size(30, 30),
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        minimumSize: Size(isMobile ? 24 : 30, isMobile ? 24 : 30),
+                        padding: EdgeInsets.symmetric(horizontal: isMobile ? 2 : 6),
                       ),
-                      child: const Icon(Icons.add, size: 20),
+                      child: Icon(Icons.add, size: isMobile ? 14 : 20),
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  SizedBox(width: isMobile ? 1 : 4),
                   Tooltip(
                     message: 'Remove',
                     child: OutlinedButton(
                       onPressed: () => _apply(context, -1),
                       style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(30, 30),
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        minimumSize: Size(isMobile ? 24 : 30, isMobile ? 24 : 30),
+                        padding: EdgeInsets.zero,
                       ),
-                      child: const Icon(Icons.remove, size: 20),
+                      child: Icon(Icons.remove, size: isMobile ? 14 : 20),
                     ),
                   ),
                 ],
-                const SizedBox(width: 0),
+                if (!isMobile) const SizedBox(width: 0),
                 if (kDebugMode) ...[
                   const SizedBox(width: 0),
                   // Reset all claims button (dev-only)
@@ -298,7 +210,7 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
 
             // Main content row with QR, sigil, and portrait
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              padding: EdgeInsets.symmetric(horizontal: 6, vertical: isMobile ? 3 : 6),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -457,7 +369,7 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                               fit: BoxFit.contain,
                             ),
                           ),
-                          SizedBox(height: isMobile ? 4 : 6),
+                          SizedBox(height: isMobile ? 2 : 6),
                         ],
                         Text(
                           ctrl.currentUserDisplayName,
@@ -467,7 +379,7 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        SizedBox(height: isMobile ? 1 : 2),
+                        SizedBox(height: isMobile ? 0 : 2),
                         Text(
                           'Hero Level: ${s.fitness.level}',
                           style: GoogleFonts.cinzel(
@@ -503,9 +415,9 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                                 child: Icon(Icons.person, size: portraitSize / 2),
                               ),
                       ),
-                      SizedBox(height: isMobile ? 4 : 6),
+                      SizedBox(height: isMobile ? 2 : 6),
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: badgePadding, vertical: isMobile ? 3 : 4),
+                        padding: EdgeInsets.symmetric(horizontal: badgePadding, vertical: isMobile ? 2 : 4),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFFF7E6),
                           borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
