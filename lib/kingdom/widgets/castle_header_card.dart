@@ -53,9 +53,9 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
   final portraitSize = isMobile ? 65.0 : 85.0;
   final iconSize = isMobile ? 14.0 : 16.0;
   final nameFontSize = isMobile ? 12.0 : 14.0;
-  final levelFontSize = isMobile ? 11.0 : 13.0;
+  final levelFontSize = isMobile ? 8.0 : 13.0;
   final goldFontSize = isMobile ? 11.0 : 12.0;
-  final badgePadding = isMobile ? 6.0 : 8.0;
+  final badgePadding = isMobile ? 4.0 : 8.0;
   final elementSpacing = isMobile ? 8.0 : 12.0;
 
   // Resolve faction -> sigil asset path
@@ -210,7 +210,7 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
 
             // Main content row with QR, sigil, and portrait
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 6, vertical: isMobile ? 3 : 6),
+              padding: EdgeInsets.symmetric(horizontal: 6, vertical: isMobile ? 2 : 6),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -369,7 +369,7 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                               fit: BoxFit.contain,
                             ),
                           ),
-                          SizedBox(height: isMobile ? 2 : 6),
+                          SizedBox(height: isMobile ? 0 : 6),
                         ],
                         Text(
                           ctrl.currentUserDisplayName,
@@ -381,10 +381,12 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                         ),
                         SizedBox(height: isMobile ? 0 : 2),
                         Text(
-                          'Hero Level: ${s.fitness.level}',
+                          'Hero Level: Coming Soon',
                           style: GoogleFonts.cinzel(
                             fontSize: levelFontSize,
                             fontWeight: FontWeight.w600,
+                            color: Colors.grey,
+                            fontStyle: FontStyle.italic,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -415,7 +417,7 @@ class _CastleHeaderCardState extends State<CastleHeaderCard> {
                                 child: Icon(Icons.person, size: portraitSize / 2),
                               ),
                       ),
-                      SizedBox(height: isMobile ? 2 : 6),
+                      SizedBox(height: isMobile ? 0 : 6),
                       Container(
                         padding: EdgeInsets.symmetric(horizontal: badgePadding, vertical: isMobile ? 2 : 4),
                         decoration: BoxDecoration(

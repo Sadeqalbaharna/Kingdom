@@ -484,6 +484,16 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
                     child: BottomNavigationBar(
                     currentIndex: _selectedIndex,
                     onTap: (index) {
+                      // Hero tab (index 2) is coming soon - show message and don't navigate
+                      if (index == 2) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Hero features coming soon!'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                        return;
+                      }
                       setState(() {
                         _selectedIndex = index;
                       });
@@ -491,7 +501,10 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
                     items: const [
                       BottomNavigationBarItem(icon: Icon(Icons.dashboard, size: 26), label: 'Home'),
                       BottomNavigationBarItem(icon: Icon(Icons.card_giftcard, size: 26), label: 'Vouchers'),
-                      BottomNavigationBarItem(icon: Icon(Icons.person, size: 26), label: 'Hero'),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.person, size: 26), 
+                        label: 'Hero',
+                      ),
                       BottomNavigationBarItem(icon: Icon(Icons.storefront, size: 26), label: 'Market'),
                     ],
                     type: BottomNavigationBarType.fixed,
