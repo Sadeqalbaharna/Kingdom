@@ -43,8 +43,11 @@ flutter:
     - assets/images/shack.png
     - assets/images/map_underlay2.png
     - assets/images/map_underlay3.png
-    - assets/images/portraits/Gemini_Generated_Image_jxdhrijxdhrijxdh.png
-    - assets/images/portraits/Gemini_Generated_Image_ldt41vldt41vldt4.png
-    - assets/images/portraits/Gemini_Generated_Image_rgtie3rgtie3rgti.png
-    - assets/images/portraits/Gemini_Generated_Image_u5ou4lu5ou4lu5ou.png
-    - assets/images/portraits/Gemini_Generated_Image_xgeshlxgeshlxges.png
+  # Faction sigils (use exact casing as on disk)
+    - assets/images/Sigils/
+    - assets/images/vouchers/freedrink.png
+    - assets/images/vouchers/main.png
+    - assets/images/vouchers/drink.png
+    - assets/images/vouchers/starter.png
+    - assets/images/vouchers/dessert.png
+    - assets/images/vouchers/soda.png
