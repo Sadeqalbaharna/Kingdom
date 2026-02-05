@@ -34,7 +34,7 @@ jobs:
         run: flutter build apk --release
       
       - name: Upload APK as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: kingdom-release-apk
           path: build/app/outputs/apk/release/app-release.apk
